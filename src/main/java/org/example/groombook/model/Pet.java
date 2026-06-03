@@ -19,8 +19,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import org.example.groombook.enums.PetDifficulty;
-import org.example.groombook.enums.PetType;
+import org.example.groombook.model.enums.PetDifficulty;
+import org.example.groombook.model.enums.PetType;
 
 import java.time.LocalDateTime;
 

@@ -15,7 +15,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import org.example.groombook.enums.OverrideType;
+import org.example.groombook.model.enums.OverrideType;
 
 import java.time.LocalDate;
 import java.time.LocalTime;

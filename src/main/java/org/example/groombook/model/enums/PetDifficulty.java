@@ -1,4 +1,4 @@
-package org.example.groombook.enums;
+package org.example.groombook.model.enums;
 
 public enum PetDifficulty {
     EASY,

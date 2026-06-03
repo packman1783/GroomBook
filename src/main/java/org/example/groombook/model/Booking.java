@@ -20,8 +20,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import org.example.groombook.enums.BookingStatus;
-import org.example.groombook.enums.BookingType;
+import org.example.groombook.model.enums.BookingStatus;
+import org.example.groombook.model.enums.BookingType;
 
 import java.time.LocalDateTime;
 

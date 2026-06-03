@@ -13,7 +13,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
-import org.example.groombook.enums.ClientStatus;
+import org.example.groombook.model.enums.ClientStatus;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

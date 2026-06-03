@@ -17,7 +17,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import org.example.groombook.enums.SlotStatus;
+import org.example.groombook.model.enums.SlotStatus;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
