@@ -1,3 +1,12 @@
 spring:
   application:
     name: GroomBook
+
+# ── Telegram Bot ──────────────────────────────────────────────────────────────
+# Токен бота от @BotFather
+grooming:
+  telegram:
+    bot-token: ${TELEGRAM_BOT_TOKEN}
+  master:
+    telegram-id: ${MASTER_TELEGRAM_ID}
+    address: ${MASTER_ADDRESS:}
