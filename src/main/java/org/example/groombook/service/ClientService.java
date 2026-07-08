@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -74,6 +75,15 @@ public class ClientService {
     @Transactional(readOnly = true)
     public List<Client> getAllClients() {
         return clientRepository.findAll();
+    }
+
+    /**
+     * Используется мастером при создании договорной записи (/manual) —
+     * ищет клиента по номеру телефона.
+     */
+    @Transactional(readOnly = true)
+    public Optional<Client> findByPhone(String phone) {
+        return clientRepository.findByPhone(phone);
     }
 
     // Управление статусом клиента — только мастер, только вручную
