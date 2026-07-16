@@ -2,11 +2,64 @@ spring:
   application:
     name: GroomBook
 
-# ── Telegram Bot ──────────────────────────────────────────────────────────────
-# Токен бота от @BotFather
+  # ── Database ──────────────────────────────────────────────────────────────────
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:groombook}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      # validate — схему создаёт только Liquibase, Hibernate только проверяет соответствие
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        # Важно: говорим Hibernate что TIMESTAMP в БД хранится без таймзоны
+        jdbc:
+          time_zone: Europe/Moscow
+
+  # ── Liquibase ─────────────────────────────────────────────────────────────────
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    drop-first: false
+    default-schema: public
+
+# ── Grooming service config ───────────────────────────────────────────────────
 grooming:
-  telegram:
-    bot-token: ${TELEGRAM_BOT_TOKEN}
+  # Токен бота от @BotFather — ключ должен совпадать с @Value("${grooming.bot.token}")
+  bot:
+    token: ${TELEGRAM_BOT_TOKEN}
+
   master:
+    # Telegram ID мастера — получить через @userinfobot
     telegram-id: ${MASTER_TELEGRAM_ID}
+    # Адрес студии — попадёт в уведомления клиенту (можно оставить пустым)
     address: ${MASTER_ADDRESS:}
+
+  # Временная зона мастера — используется в GoogleCalendarServiceImpl
+  timezone: Europe/Moscow
+
+  # Google Calendar — используется в GoogleCalendarConfig и GoogleCalendarServiceImpl
+  google:
+    # Путь к JSON-ключу Service Account (скачать из Google Cloud Console)
+    credentials-path: ${GOOGLE_CREDENTIALS_PATH:/path/to/credentials.json}
+    # ID календаря мастера: "primary" или email мастера
+    calendar-id: ${GOOGLE_CALENDAR_ID:primary}
+    application-name: GroomBook
+
+logging:
+  level:
+    org.example.groombook: INFO
+    org.springframework.web: WARN
+    org.hibernate.SQL: WARN
+    liquibase: INFO
