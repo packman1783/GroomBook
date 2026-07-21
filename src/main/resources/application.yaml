@@ -52,7 +52,7 @@ grooming:
   # Google Calendar — используется в GoogleCalendarConfig и GoogleCalendarServiceImpl
   google:
     # Путь к JSON-ключу Service Account (скачать из Google Cloud Console)
-    credentials-path: ${GOOGLE_CREDENTIALS_PATH:/path/to/credentials.json}
+    credentials-path: ${GOOGLE_CREDENTIALS_PATH:src/main/resources/credentials.json}
     # ID календаря мастера: "primary" или email мастера
     calendar-id: ${GOOGLE_CALENDAR_ID:primary}
     application-name: GroomBook
