@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    # URL подставляется Testcontainers динамически через @DynamicPropertySource
+    url: jdbc:tc:postgresql:16-alpine:///groombook
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.xml
+
+# Отключаем Telegram бота и Google Calendar в тестах
+grooming:
+  bot:
+    token: test-token
+  master:
+    telegram-id: 123456789
+    address: ""
+  timezone: Europe/Moscow
+  google:
+    credentials-path: /dev/null
+    calendar-id: primary
+    application-name: GroomBook-Test
