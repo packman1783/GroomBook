@@ -36,16 +36,17 @@ CREATE UNIQUE INDEX idx_one_active_booking_per_slot
 -- changeset groombook:14 labels:v2 comment:Индекс для day_overrides
 CREATE INDEX idx_overrides_date ON day_overrides (date);
 
--- changeset groombook:15 labels:v2 comment:Функция автообновления updated_at для clients
+-- changeset groombook:15 endDelimiter:\n--SQL labels:v2 comment:Функция автообновления updated_at и триггер для clients
 CREATE OR REPLACE FUNCTION update_updated_at_column()
     RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = NOW();
-RETURN NEW;
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_clients_updated_at
     BEFORE UPDATE ON clients
     FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+EXECUTE FUNCTION update_updated_at_column();
+--SQL
