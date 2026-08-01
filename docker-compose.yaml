@@ -1,21 +1,54 @@
-
 services:
+
+  # ── База данных ──────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: groombook-db
     environment:
-      POSTGRES_DB: groombook
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${DB_NAME:-groombook}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d groombook"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-groombook}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  # ── Приложение ───────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: groombook-app
+    # Передаём переменные из .env файла в контейнер приложения
+    environment:
+      DB_HOST: postgres          # имя сервиса postgres внутри docker-compose сети
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-groombook}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      MASTER_TELEGRAM_ID: ${MASTER_TELEGRAM_ID}
+      MASTER_ADDRESS: ${MASTER_ADDRESS:-}
+      GOOGLE_CREDENTIALS_PATH: /app/credentials/credentials.json
+      GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-primary}
+    ports:
+      - "8080:8080"
+    volumes:
+      # Монтируем папку с credentials.json для Google Calendar
+      # Положите файл credentials.json рядом с docker-compose.yaml
+      - ./credentials:/app/credentials:ro
+    depends_on:
+      postgres:
+        condition: service_healthy   # ждём пока PostgreSQL готов принимать соединения
+    restart: unless-stopped
+    mem_limit: 512m                  # ограничение памяти — JVM возьмёт 75% = ~384MB
 
 volumes:
   postgres_data:
+    
