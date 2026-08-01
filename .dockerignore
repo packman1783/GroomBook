@@ -1,0 +1,37 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Gradle кэш и временные файлы
+.gradle
+build/
+out/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# Тесты — не нужны в образе
+src/test/
+
+# Документация и конфиги разработки
+README.md
+*.md
+.env
+.env.*
+
+# Credentials — монтируются через volume, не копируются в образ
+credentials/
+credentials.json
+
+# OS файлы
+.DS_Store
+Thumbs.db
+
+# Логи
+*.log
+logs/
