@@ -43,7 +43,7 @@ CREATE TABLE schedule_templates
     is_active            BOOLEAN      NOT NULL DEFAULT FALSE,
     active_from          DATE,
     active_until         DATE,
-    slot_duration_hours  SMALLINT     NOT NULL DEFAULT 2,
+    slot_duration_hours  INTEGER      NOT NULL DEFAULT 2,
     created_at           TIMESTAMP    NOT NULL DEFAULT NOW(),
 
     CONSTRAINT chk_slot_duration CHECK (slot_duration_hours IN (1, 2, 3))
@@ -54,7 +54,7 @@ CREATE TABLE template_days
 (
     id           BIGSERIAL PRIMARY KEY,
     template_id  BIGINT   NOT NULL REFERENCES schedule_templates (id) ON DELETE CASCADE,
-    day_of_week  SMALLINT NOT NULL,
+    day_of_week  INTEGER  NOT NULL,
     is_working   BOOLEAN  NOT NULL DEFAULT TRUE,
     start_time   TIME,
     end_time     TIME,
