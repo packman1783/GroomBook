@@ -46,6 +46,16 @@ public final class CallbackData {
     public static final String MANUAL_PICK_CLIENT = "MANUAL_PICK_CLIENT";
     public static final String MANUAL_PICK_PET = "MANUAL_PICK_PET";
 
+    // ── Wizard создания шаблона ──────────────────────────────────────────────────
+    public static final String TEMPLATE_NEW           = "TEMPLATE_NEW";
+    public static final String TEMPLATE_TOGGLE_DAY    = "TEMPLATE_TOGGLE_DAY";
+    public static final String TEMPLATE_DAYS_DONE     = "TEMPLATE_DAYS_DONE";
+    public static final String TEMPLATE_START_TIME    = "TEMPLATE_START_TIME";
+    public static final String TEMPLATE_END_TIME      = "TEMPLATE_END_TIME";
+    public static final String TEMPLATE_DURATION      = "TEMPLATE_DURATION";
+    public static final String TEMPLATE_CONFIRM       = "TEMPLATE_CONFIRM";
+    public static final String TEMPLATE_CANCEL_WIZARD = "TEMPLATE_CANCEL_WIZARD";
+
     /**
      * Часть до первого ':' — тип callback
      */
