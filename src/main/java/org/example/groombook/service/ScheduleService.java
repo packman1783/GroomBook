@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 
 @Slf4j
@@ -361,6 +362,43 @@ public class ScheduleService {
                 .distinct()
                 .sorted()
                 .toList();
+    }
+
+    /**
+     * Создать новый шаблон расписания из данных wizard-а.
+     * Шаблон создаётся неактивным — мастер активирует его отдельно через /schedule.
+     * Одинаковые часы начала/конца применяются ко всем рабочим дням шаблона.
+     */
+    @Transactional
+    public ScheduleTemplate createTemplate(String name,
+                                           int slotDurationHours,
+                                           Set<Integer> workingDays,
+                                           LocalTime startTime,
+                                           LocalTime endTime) {
+        ScheduleTemplate template = ScheduleTemplate.builder()
+                .name(name)
+                .active(false)       // новый шаблон всегда неактивен — мастер активирует сам
+                .slotDurationHours(slotDurationHours)
+                .days(new java.util.ArrayList<>())
+                .build();
+
+        // Создаём запись для каждого дня недели (1=Пн..7=Вс)
+        for (int dow = 1; dow <= 7; dow++) {
+            boolean isWorking = workingDays.contains(dow);
+            TemplateDay day = TemplateDay.builder()
+                    .template(template)
+                    .dayOfWeek(dow)
+                    .working(isWorking)
+                    .startTime(isWorking ? startTime : null)
+                    .endTime(isWorking ? endTime : null)
+                    .build();
+            template.getDays().add(day);
+        }
+
+        templateRepository.save(template);
+        log.info("Создан шаблон '{}' слот={}ч рабочихДней={}",
+                name, slotDurationHours, workingDays.size());
+        return template;
     }
 
     // Приватные вспомогательные методы
