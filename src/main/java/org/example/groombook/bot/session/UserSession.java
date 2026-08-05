@@ -2,6 +2,10 @@ package org.example.groombook.bot.session;
 
 import lombok.Data;
 
+import java.time.LocalTime;
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Состояние диалога с конкретным пользователем + временные данные
  * накопленные в процессе многошагового сценария.
@@ -42,6 +46,14 @@ public class UserSession {
     private Long pendingManualPetId;
     private java.time.LocalDate pendingManualDate;
 
+    // Wizard создания шаблона
+    private String pendingTemplateName;
+    private Set<Integer> pendingTemplateWorkingDays;
+    private LocalTime pendingTemplateStartTime;
+    private LocalTime pendingTemplateEndTime;
+    private Integer pendingTemplateSlotDuration;
+    private Integer pendingTemplateMessageId; // ID сообщения с кнопками дней для редактирования
+
     /**
      * Сброс состояния после завершения или отмены сценария
      */
@@ -59,5 +71,11 @@ public class UserSession {
         this.pendingManualClientId = null;
         this.pendingManualPetId = null;
         this.pendingManualDate = null;
+        this.pendingTemplateName = null;
+        this.pendingTemplateWorkingDays = new HashSet<>();
+        this.pendingTemplateStartTime = null;
+        this.pendingTemplateEndTime = null;
+        this.pendingTemplateSlotDuration = null;
+        this.pendingTemplateMessageId = null;
     }
 }
