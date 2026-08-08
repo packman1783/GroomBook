@@ -34,12 +34,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ClientHandler {
 
-    private final ClientService         clientService;
-    private final BookingService        bookingService;
-    private final ScheduleService       scheduleService;
-    private final SessionManager        sessionManager;
+    private final ClientService clientService;
+    private final BookingService bookingService;
+    private final ScheduleService scheduleService;
+    private final SessionManager sessionManager;
     private final InlineKeyboardFactory keyboards;
-    private final TelegramClient        telegramClient;
+    private final TelegramClient telegramClient;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("d MMMM");
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
@@ -50,10 +50,10 @@ public class ClientHandler {
         String command = text.split("\\s+")[0].toLowerCase();
 
         switch (command) {
-            case "/start"       -> handleStart(telegramId);
-            case "/book"        -> handleBookStart(telegramId);
-            case "/mybookings"  -> handleMyBookings(telegramId);
-            case "/addpet"      -> handleAddPetStart(telegramId);
+            case "/start" -> handleStart(telegramId);
+            case "/book" -> handleBookStart(telegramId);
+            case "/mybookings" -> handleMyBookings(telegramId);
+            case "/addpet" -> handleAddPetStart(telegramId);
             default -> send(telegramId, "Не знаю такую команду. Доступно: /book, /mybookings, /addpet");
         }
     }
