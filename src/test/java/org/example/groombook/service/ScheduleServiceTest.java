@@ -46,16 +46,21 @@ import static org.mockito.Mockito.when;
 @DisplayName("ScheduleService")
 class ScheduleServiceTest {
 
-    @Mock ScheduleTemplateRepository templateRepository;
-    @Mock DayOverrideRepository      overrideRepository;
-    @Mock TimeSlotRepository         timeSlotRepository;
+    @Mock
+    ScheduleTemplateRepository templateRepository;
+    @Mock
+    DayOverrideRepository overrideRepository;
+    @Mock
+    TimeSlotRepository timeSlotRepository;
 
     @InjectMocks
     ScheduleService scheduleService;
 
     // ── Общие тестовые данные ─────────────────────────────────────────────────
 
-    /** Шаблон: Пн–Пт рабочие 09:00–19:00, слот 2 часа */
+    /**
+     * Шаблон: Пн–Пт рабочие 09:00–19:00, слот 2 часа
+     */
     private ScheduleTemplate activeTemplate;
 
     @BeforeEach
@@ -203,7 +208,7 @@ class ScheduleServiceTest {
             when(templateRepository.findActive()).thenReturn(Optional.of(activeTemplate));
             when(overrideRepository.findByDate(monday)).thenReturn(Optional.empty());
             // Первые 3 слота уже есть, последние 2 — нет
-            when(timeSlotRepository.existsByDateAndStartTime(eq(monday), eq(LocalTime.of(9,  0)))).thenReturn(true);
+            when(timeSlotRepository.existsByDateAndStartTime(eq(monday), eq(LocalTime.of(9, 0)))).thenReturn(true);
             when(timeSlotRepository.existsByDateAndStartTime(eq(monday), eq(LocalTime.of(11, 0)))).thenReturn(true);
             when(timeSlotRepository.existsByDateAndStartTime(eq(monday), eq(LocalTime.of(13, 0)))).thenReturn(true);
             when(timeSlotRepository.existsByDateAndStartTime(eq(monday), eq(LocalTime.of(15, 0)))).thenReturn(false);
@@ -471,7 +476,7 @@ class ScheduleServiceTest {
         @DisplayName("✅ 3-дневный период — 3 override-записи, 3 удаления FREE-слотов")
         void blockDateRange_threeDays_createsOverridesAndDeletesSlots() {
             LocalDate from = LocalDate.now().plusDays(10);
-            LocalDate to   = LocalDate.now().plusDays(12);
+            LocalDate to = LocalDate.now().plusDays(12);
 
             when(overrideRepository.existsByDate(any())).thenReturn(false);
             when(overrideRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -546,8 +551,12 @@ class ScheduleServiceTest {
         @Test
         @DisplayName("✅ горизонт не заполнен — генерирует следующий день")
         void generateNextDay_horizonNotFull_generatesNextDay() {
-            // Максимальная дата в БД — 5 дней вперёд (до горизонта 14 дней ещё есть место)
-            LocalDate maxDate = LocalDate.now().plusDays(5);
+            // Фиксируем maxDate = воскресенье, тогда nextDay = понедельник (рабочий день)
+            // Это делает тест детерминированным независимо от текущего дня недели
+            LocalDate nextMonday = LocalDate.now()
+                    .with(java.time.temporal.TemporalAdjusters.next(java.time.DayOfWeek.MONDAY));
+            LocalDate maxDate = nextMonday.minusDays(1); // воскресенье перед следующим понедельником
+
             when(timeSlotRepository.findMaxGeneratedDate()).thenReturn(Optional.of(maxDate));
             when(templateRepository.findActive()).thenReturn(Optional.of(activeTemplate));
             when(overrideRepository.findByDate(any())).thenReturn(Optional.empty());
@@ -556,8 +565,8 @@ class ScheduleServiceTest {
 
             scheduleService.generateNextDay();
 
-            // Должны были попробовать сгенерировать день maxDate + 1
             verify(templateRepository).findActive();
+            verify(timeSlotRepository).saveAll(any()); // понедельник — рабочий, слоты создаются
         }
 
         @Test
