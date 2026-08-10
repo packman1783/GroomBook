@@ -297,7 +297,7 @@ class ClientServiceTest {
             List<Pet> result = clientService.getActivePets(100L);
 
             assertThat(result).hasSize(1);
-            assertThat(result.get(0).getName()).isEqualTo("Рекс");
+            assertThat(result.getFirst().getName()).isEqualTo("Рекс");
         }
 
         @Test
