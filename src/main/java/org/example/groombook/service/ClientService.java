@@ -21,6 +21,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Сервис управления профилями клиентов и их питомцами.
+ * <p>
+ * Обеспечивает логику регистрации пользователей, проверки их статусов, добавления
+ * и деактивации питомцев, а также ведения служебных заметок мастера (например, уровня сложности ухода).
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,8 +38,9 @@ public class ClientService {
     // Регистрация и поиск клиента
 
     /**
-     * Найти клиента по Telegram ID или создать нового.
-     * Вызывается при каждом обращении к боту — определяет новый клиент или нет.
+     * Возвращает существующего клиента или регистрирует нового.
+     * <p>
+     * Инициализируется при каждом первичном обращении пользователя к Telegram-боту.
      */
     @Transactional
     public Client getOrCreateClient(Long telegramId, String name, String phone) {
@@ -42,8 +49,8 @@ public class ClientService {
     }
 
     /**
-     * Проверить зарегистрирован ли клиент по Telegram ID.
-     * Используется в боте при /start — чтобы не спрашивать данные повторно.
+     * Проверяет факт наличия зарегистрированного профиля по Telegram ID.
+     * Используется обработчиком команды {@code /start} для предотвращения повторной анкетирования.
      */
     @Transactional(readOnly = true)
     public boolean isRegistered(Long telegramId) {
@@ -51,8 +58,7 @@ public class ClientService {
     }
 
     /**
-     * Получить клиента по Telegram ID.
-     * Выбрасывает исключение если клиент не найден.
+     * Получает сущность клиента по его Telegram ID.
      */
     @Transactional(readOnly = true)
     public Client getByTelegramId(Long telegramId) {
@@ -61,7 +67,7 @@ public class ClientService {
     }
 
     /**
-     * Получить клиента по ID — для команд мастера.
+     * Поиск клиента по внутреннему первичному ключу БД.
      */
     @Transactional(readOnly = true)
     public Client getById(Long clientId) {
@@ -70,7 +76,8 @@ public class ClientService {
     }
 
     /**
-     * Все клиенты — для поиска при создании договорной записи мастером.
+     * Возвращает полный список всех зарегистрированных клиентов.
+     * Используется мастером при выгрузках и оформлении manual-записей.
      */
     @Transactional(readOnly = true)
     public List<Client> getAllClients() {
@@ -78,8 +85,8 @@ public class ClientService {
     }
 
     /**
-     * Используется мастером при создании договорной записи (/manual) —
-     * ищет клиента по номеру телефона.
+     * Поиск профиля клиента по номеру телефона.
+     * Применяется при ручном создании запись мастером (команда {@code /manual}).
      */
     @Transactional(readOnly = true)
     public Optional<Client> findByPhone(String phone) {
@@ -89,9 +96,9 @@ public class ClientService {
     // Управление статусом клиента — только мастер, только вручную
 
     /**
-     * Изменить статус клиента.
-     * Блокировка, установка флага, требование подтверждения — всё здесь.
-     * Причина хранится в БД и видна только мастеру.
+     * Изменяет текущий статус клиента (например, блокировка и т.д.).
+     * <p>
+     * Выполняется исключительно мастером вручную. Причина изменения фиксируется в БД.
      */
     @Transactional
     public Client changeClientStatus(Long clientId, ClientStatus newStatus,
@@ -110,7 +117,8 @@ public class ClientService {
     }
 
     /**
-     * Клиенты не приходившие более N дней — для отчёта мастера "давно не приходили".
+     * Формирует список клиентов, у которых не было посещений за последние N дней.
+     * Используется для маркетингового анализа и рассылок мастера.
      */
     @Transactional(readOnly = true)
     public List<Client> getInactiveClients(int days) {
@@ -121,8 +129,9 @@ public class ClientService {
     // Управление питомцами
 
     /**
-     * Добавить питомца клиенту.
-     * Вызывается при первой регистрации или командой /addpet.
+     * Привязывает нового питомца к профилю клиента.
+     * Вызывается при первичной регистрации или при вызове команды {@code /addpet}.
+     * По умолчанию питомцу присваивается базовая сложность {@link PetDifficulty#EASY}.
      */
     @Transactional
     public Pet addPet(Long telegramId, String name, PetType type, String breed) {
@@ -146,7 +155,8 @@ public class ClientService {
     }
 
     /**
-     * Активные питомцы клиента — для показа списка при бронировании.
+     * Возвращает список только активных питомцев клиента.
+     * Используется при выборе питомца в процессе создания записи.
      */
     @Transactional(readOnly = true)
     public List<Pet> getActivePets(Long telegramId) {
@@ -156,7 +166,8 @@ public class ClientService {
     }
 
     /**
-     * Все питомцы клиента включая деактивированных — для истории и статистики.
+     * Возвращает полный список питомцев клиента, включая архивных (деактивированных).
+     * Служит для поднятия истории приемов.
      */
     @Transactional(readOnly = true)
     public List<Pet> getAllPets(Long clientId) {
@@ -164,8 +175,7 @@ public class ClientService {
     }
 
     /**
-     * Мастер обновляет сложность питомца после визита.
-     * Например, после первого визита выставляет HARD с пояснением.
+     * Обновляет уровень сложности груминга питомца и добавляет заметки мастером.
      */
     @Transactional
     public Pet updatePetDifficulty(Long petId, Long masterClientId,
@@ -184,8 +194,8 @@ public class ClientService {
     }
 
     /**
-     * Деактивировать питомца — soft delete.
-     * Питомец пропадает из списка при бронировании, но остаётся в истории броней.
+     * Выполняет мягкое удаление (деактивацию) питомца из профиля клиента.
+     * Питомец перестает отображаться при создании бронирований, но остается в исторической отчетности.
      */
     @Transactional
     public void deactivatePet(Long petId, Long telegramId) {
@@ -207,6 +217,10 @@ public class ClientService {
 
     // Приватные методы
 
+    /**
+     * Создает и сохраняет новую запись клиента в БД с проверкой уникальности телефона.
+
+     */
     private Client registerNewClient(Long telegramId, String name, String phone) {
         // Телефон должен быть уникальным
         if (clientRepository.existsByPhone(phone)) {
