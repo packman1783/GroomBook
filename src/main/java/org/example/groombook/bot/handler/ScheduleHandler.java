@@ -35,6 +35,17 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Хэндлер для гибкой настройки рабочего расписания мастера.
+ * <p>
+ * Реализует возможности:
+ * <ul>
+ *   <li>Активации и переключения шаблонов рабочих дней</li>
+ *   <li>Ручной точечной блокировки отдельных слотов</li>
+ *   <li>Оформления периода отпуска (блокировки интервала дат с проверкой пересечений с записями)</li>
+ *   <li>Создания договорных ("ручных") записей в обход стандартных проверок доступности</li>
+ * </ul>
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -43,50 +54,41 @@ public class ScheduleHandler {
     private final ScheduleService scheduleService;
     private final ClientService clientService;
     private final BookingService bookingService;
-    private final TemplateWizardHandler templateWizardHandler;
     private final SessionManager sessionManager;
     private final TelegramClient telegramClient;
 
+    /** Формат ввода дат пользователем (например, "25.12.2026"). */
     private static final DateTimeFormatter DATE_INPUT_FMT = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("d MMMM");
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
-    // Публичные команды — вызываются из MasterHandler
+    // --- Публичные команды ---
 
-    /**
-     * /schedule — главное меню управления расписанием
-     */
+    /** Вывод главного меню управления расписанием. */
     public void handleScheduleCommand(Long telegramId) {
         InlineKeyboardMarkup keyboard = InlineKeyboardMarkup.builder()
-                .keyboardRow(new InlineKeyboardRow(
-                        btn("📋 Шаблоны", CallbackData.SCHEDULE_TEMPLATES)))
-                .keyboardRow(new InlineKeyboardRow(
-                        btn("🚫 Заблокировать слот", CallbackData.SCHEDULE_BLOCK)))
-                .keyboardRow(new InlineKeyboardRow(
-                        btn("🏖 Отпуск / нерабочий период", CallbackData.SCHEDULE_VACATION)))
-                .keyboardRow(new InlineKeyboardRow(
-                        btn("🤝 Договорная запись", CallbackData.SCHEDULE_MANUAL)))
+                .keyboardRow(new InlineKeyboardRow(btn("📋 Шаблоны", CallbackData.SCHEDULE_TEMPLATES)))
+                .keyboardRow(new InlineKeyboardRow(btn("🚫 Заблокировать слот", CallbackData.SCHEDULE_BLOCK)))
+                .keyboardRow(new InlineKeyboardRow(btn("🏖 Отпуск / нерабочий период", CallbackData.SCHEDULE_VACATION)))
+                .keyboardRow(new InlineKeyboardRow(btn("🤝 Договорная запись", CallbackData.SCHEDULE_MANUAL)))
                 .build();
 
         send(telegramId, "Управление расписанием:", keyboard);
     }
 
-    /**
-     * /vacation — быстрый вход в блокировку периода (минуя меню)
-     */
+    /** Быстрый запуск сценария оформления отпуска. */
     public void handleVacationCommand(Long telegramId) {
         startVacation(telegramId, null);
     }
 
-    /**
-     * /manual — быстрый вход в создание договорной записи (минуя меню)
-     */
+    /** Быстрый запуск сценария ручного создания записи мастеру. */
     public void handleManualCommand(Long telegramId) {
         startManualBooking(telegramId, null);
     }
 
-    // Callback-маршрутизация
+    // --- Callback-маршрутизация ---
 
+    /** Обработка кликов в меню управления расписанием. */
     public void handleCallback(Long telegramId, String data, String callbackId) {
         String prefix = CallbackData.prefix(data);
 
@@ -95,27 +97,22 @@ public class ScheduleHandler {
             case CallbackData.SCHEDULE_BLOCK -> startBlockSlot(telegramId, callbackId);
             case CallbackData.SCHEDULE_VACATION -> startVacation(telegramId, callbackId);
             case CallbackData.SCHEDULE_MANUAL -> startManualBooking(telegramId, callbackId);
-
-            case CallbackData.TEMPLATE_ACTIVATE -> startTemplateActivation(telegramId,
-                    CallbackData.payloadAsLong(data), callbackId);
-
-            case CallbackData.BLOCK_PICK_SLOT -> finishBlockSlotPick(telegramId,
-                    CallbackData.payloadAsLong(data), callbackId);
-
-            case CallbackData.MANUAL_PICK_PET -> finishManualPetPick(telegramId,
-                    CallbackData.payloadAsLong(data), callbackId);
-
+            case CallbackData.TEMPLATE_ACTIVATE -> startTemplateActivation(telegramId, CallbackData.payloadAsLong(data), callbackId);
+            case CallbackData.BLOCK_PICK_SLOT -> finishBlockSlotPick(telegramId, CallbackData.payloadAsLong(data), callbackId);
+            case CallbackData.MANUAL_PICK_PET -> finishManualPetPick(telegramId, CallbackData.payloadAsLong(data), callbackId);
             default -> answerCallback(callbackId, null);
         }
     }
 
-    // Шаблоны: список → выбор → дата активации
+    // --- Управление шаблонами ---
 
+    /**
+     * Отображает список существующих шаблонов с возможностью активации любого из них.
+     */
     private void showTemplates(Long telegramId, String callbackId) {
         if (callbackId != null) answerCallback(callbackId, null);
 
         List<ScheduleTemplate> templates = scheduleService.getAllTemplates();
-
         var builder = InlineKeyboardMarkup.builder();
 
         if (templates.isEmpty()) {
@@ -123,47 +120,36 @@ public class ScheduleHandler {
                     "Шаблонов расписания пока нет.\n\n" +
                             "Нажмите кнопку ниже чтобы создать первый шаблон через удобный диалог:",
                     InlineKeyboardMarkup.builder()
-                            .keyboardRow(new InlineKeyboardRow(
-                                    btn("➕ Создать шаблон", CallbackData.TEMPLATE_NEW)))
+                            .keyboardRow(new InlineKeyboardRow(btn("➕ Создать шаблон", CallbackData.TEMPLATE_NEW)))
                             .build());
             return;
         }
 
-        // Список существующих шаблонов
         for (ScheduleTemplate t : templates) {
-            String label = (t.isActive() ? "✅ " : "") +
-                    t.getName() + " (" + t.getSlotDurationHours() + "ч)";
-            builder.keyboardRow(new InlineKeyboardRow(
-                    btn(label, CallbackData.build(CallbackData.TEMPLATE_ACTIVATE, t.getId()))));
+            String label = (t.isActive() ? "✅ " : "") + t.getName() + " (" + t.getSlotDurationHours() + "ч)";
+            builder.keyboardRow(new InlineKeyboardRow(btn(label, CallbackData.build(CallbackData.TEMPLATE_ACTIVATE, t.getId()))));
         }
 
-        // Кнопка создания нового шаблона — всегда внизу списка
-        builder.keyboardRow(new InlineKeyboardRow(
-                btn("➕ Создать новый шаблон", CallbackData.TEMPLATE_NEW)));
+        builder.keyboardRow(new InlineKeyboardRow(btn("➕ Создать новый шаблон", CallbackData.TEMPLATE_NEW)));
 
-        send(telegramId,
-                "Выберите шаблон для активации или создайте новый:\n" +
-                        "_(✅ — активный шаблон)_",
-                builder.build());
+        send(telegramId, "Выберите шаблон для активации или создайте новый:\n_(✅ — активный шаблон)_", builder.build());
     }
 
+    /** Запрос даты, с которой должен вступить в силу выбранный шаблон. */
     private void startTemplateActivation(Long telegramId, Long templateId, String callbackId) {
         answerCallback(callbackId, null);
         UserSession session = sessionManager.get(telegramId);
-        session.setPendingClientId(templateId);
+        session.setPendingTemplateId(templateId);
         session.setState(SessionState.AWAITING_TEMPLATE_ACTIVATE_DATE);
-        send(telegramId,
-                "С какой даты активировать шаблон?\n" +
-                        "Формат: дд.мм.гггг (или отправьте \"сегодня\")");
+        send(telegramId, "С какой даты активировать шаблон?\nФормат: дд.мм.гггг (или отправьте \"сегодня\")");
     }
 
+    /** Применение шаблона к расписанию с указанной даты. */
     private void finishTemplateActivation(Long telegramId, String text) {
         UserSession session = sessionManager.get(telegramId);
-        Long templateId = session.getPendingClientId();
+        Long templateId = session.getPendingTemplateId();
 
-        LocalDate from = text.equalsIgnoreCase("сегодня")
-                ? LocalDate.now()
-                : parseDateOrNull(text);
+        LocalDate from = "сегодня".equalsIgnoreCase(text.trim()) ? LocalDate.now() : parseDateOrNull(text);
 
         if (from == null) {
             send(telegramId, "Не получилось распознать дату. Используйте формат дд.мм.гггг.");
@@ -172,8 +158,7 @@ public class ScheduleHandler {
 
         try {
             scheduleService.activateTemplate(templateId, from, null);
-            send(telegramId, "✅ Шаблон активирован с " + from.format(DATE_FMT) +
-                    ". Свободные слоты пересчитаны.");
+            send(telegramId, "✅ Шаблон активирован с " + from.format(DATE_FMT) + ". Свободные слоты пересчитаны.");
         } catch (GroomBookException e) {
             send(telegramId, "Не удалось активировать шаблон: " + e.getMessage());
         } finally {
@@ -181,14 +166,16 @@ public class ScheduleHandler {
         }
     }
 
-    // Блокировка слота
+    // --- Блокировка слотов ---
 
+    /** Запрос даты для поиска слотов, подлежащих блокировке. */
     private void startBlockSlot(Long telegramId, String callbackId) {
         if (callbackId != null) answerCallback(callbackId, null);
         sessionManager.get(telegramId).setState(SessionState.AWAITING_BLOCK_DATE);
         send(telegramId, "На какую дату заблокировать слот?\nФормат: дд.мм.гггг");
     }
 
+    /** Получение списка доступных слотов на выбранную дату и их вывод в виде инлайн-клавиатуры. */
     private void handleBlockDateEntered(Long telegramId, String text) {
         LocalDate date = parseDateOrNull(text);
         if (date == null) {
@@ -218,10 +205,10 @@ public class ScheduleHandler {
             return;
         }
 
-        send(telegramId, "Выберите слот для блокировки:",
-                InlineKeyboardMarkup.builder().keyboard(rows).build());
+        send(telegramId, "Выберите слот для блокировки:", InlineKeyboardMarkup.builder().keyboard(rows).build());
     }
 
+    /** Переход к запросу причины блокировки выбранного слота. */
     private void finishBlockSlotPick(Long telegramId, Long slotId, String callbackId) {
         answerCallback(callbackId, null);
         UserSession session = sessionManager.get(telegramId);
@@ -230,6 +217,7 @@ public class ScheduleHandler {
         send(telegramId, "Укажите причину блокировки (видна только вам):");
     }
 
+    /** Вызов сервиса для непосредственной блокировки слота в БД. */
     private void handleBlockReasonEntered(Long telegramId, String reason) {
         UserSession session = sessionManager.get(telegramId);
         try {
@@ -242,16 +230,18 @@ public class ScheduleHandler {
         }
     }
 
-    // Отпуск / нерабочий период
+    // --- Отпуск / Блокировка периода ---
 
+    /** Инициализация ввода диапазона дат отпуска. */
     private void startVacation(Long telegramId, String callbackId) {
         if (callbackId != null) answerCallback(callbackId, null);
         sessionManager.get(telegramId).setState(SessionState.AWAITING_VACATION_RANGE);
-        send(telegramId,
-                "Укажите период в формате: дд.мм.гггг-дд.мм.гггг\n" +
-                        "Например: 10.07.2025-20.07.2025");
+        send(telegramId, "Укажите период в формате: дд.мм.гггг-дд.мм.гггг\nНапример: 10.07.2025-20.07.2025");
     }
 
+    /**
+     * Валидация периода отпуска, блокировка дней и форматирование отчета с затронутыми записями клиентов.
+     */
     private void handleVacationRangeEntered(Long telegramId, String text) {
         String[] parts = text.split("-");
         if (parts.length != 2) {
@@ -268,7 +258,6 @@ public class ScheduleHandler {
         }
 
         scheduleService.blockDateRange(from, to, OverrideType.VACATION, "Отпуск");
-
         List<Booking> affected = bookingService.getActiveBookingsInRange(from, to);
 
         StringBuilder report = new StringBuilder();
@@ -294,22 +283,22 @@ public class ScheduleHandler {
         sessionManager.get(telegramId).reset();
     }
 
-    // Договорная запись
+    // --- Договорная запись ---
 
+    /** Старт ручного создания визита: запуск поиска клиента по номеру телефона. */
     private void startManualBooking(Long telegramId, String callbackId) {
         if (callbackId != null) answerCallback(callbackId, null);
         sessionManager.get(telegramId).setState(SessionState.AWAITING_MANUAL_CLIENT_PHONE);
         send(telegramId, "Введите номер телефона клиента:");
     }
 
+    /** Поиск клиента по номеру телефона и отображение его питомцев для выбора. */
     private void handleManualClientPhoneEntered(Long telegramId, String phone) {
-        Optional<org.example.groombook.model.Client> clientOpt =
-                clientService.findByPhone(phone.trim());
+        Optional<Client> clientOpt = clientService.findByPhone(phone.trim());
 
         if (clientOpt.isEmpty()) {
-            send(telegramId,
-                    "Клиент с таким номером не найден.\n" +
-                            "Проверьте номер и попробуйте снова, либо отмените через /schedule.");
+            send(telegramId, "Клиент с таким номером не найден.\n" +
+                    "Проверьте номер и попробуйте снова, либо отмените через /schedule.");
             return;
         }
 
@@ -326,15 +315,13 @@ public class ScheduleHandler {
         session.setPendingManualClientId(client.getId());
 
         var rows = pets.stream()
-                .map(p -> new InlineKeyboardRow(btn(p.getName(),
-                        CallbackData.build(CallbackData.MANUAL_PICK_PET, p.getId()))))
+                .map(p -> new InlineKeyboardRow(btn(p.getName(), CallbackData.build(CallbackData.MANUAL_PICK_PET, p.getId()))))
                 .toList();
 
-        send(telegramId,
-                "Клиент: " + client.getName() + ". Выберите питомца:",
-                InlineKeyboardMarkup.builder().keyboard(rows).build());
+        send(telegramId, "Клиент: " + client.getName() + ". Выберите питомца:", InlineKeyboardMarkup.builder().keyboard(rows).build());
     }
 
+    /** Сохранение выбранного питомца и запрос даты записи. */
     private void finishManualPetPick(Long telegramId, Long petId, String callbackId) {
         answerCallback(callbackId, null);
         UserSession session = sessionManager.get(telegramId);
@@ -343,6 +330,7 @@ public class ScheduleHandler {
         send(telegramId, "На какую дату запись?\nФормат: дд.мм.гггг");
     }
 
+    /** Парсинг и сохранение даты договорного визита. */
     private void handleManualDateEntered(Long telegramId, String text) {
         LocalDate date = parseDateOrNull(text);
         if (date == null) {
@@ -355,6 +343,7 @@ public class ScheduleHandler {
         send(telegramId, "Во сколько начало? Формат: ЧЧ:мм (например 14:30).");
     }
 
+    /** Парсинг и сохранение времени начала договорного визита. */
     private void handleManualTimeEntered(Long telegramId, String text) {
         LocalTime time;
         try {
@@ -365,15 +354,16 @@ public class ScheduleHandler {
         }
 
         UserSession session = sessionManager.get(telegramId);
-        session.setPendingClientId((long) timeToMinutes(time));
+        session.setPendingManualTime(time);
         session.setState(SessionState.AWAITING_MANUAL_COMMENT);
         send(telegramId, "Комментарий к записи (или \"-\" чтобы пропустить):");
     }
 
+    /** Финализация создания запись вручную мастером. */
     private void handleManualCommentEntered(Long telegramId, String text) {
         UserSession session = sessionManager.get(telegramId);
-        String comment = text.equals("-") ? null : text;
-        LocalTime time = minutesToTime(session.getPendingClientId().intValue());
+        String comment = "-".equals(text) ? null : text;
+        LocalTime time = session.getPendingManualTime();
 
         try {
             bookingService.createManualBooking(
@@ -382,11 +372,10 @@ public class ScheduleHandler {
                     session.getPendingManualDate(),
                     time, 2, comment);
 
-            send(telegramId,
-                    "✅ Договорная запись создана на " +
-                            session.getPendingManualDate().format(DATE_FMT) +
-                            " в " + time.format(TIME_FMT) +
-                            ".\nКлиент не уведомляется — вы уже договорились лично.");
+            send(telegramId, "✅ Договорная запись создана на " +
+                    session.getPendingManualDate().format(DATE_FMT) +
+                    " в " + time.format(TIME_FMT) +
+                    ".\nКлиент не уведомляется — вы уже договорились лично.");
         } catch (GroomBookException e) {
             send(telegramId, "Не удалось создать запись: " + e.getMessage());
         } finally {
@@ -394,8 +383,11 @@ public class ScheduleHandler {
         }
     }
 
-    // Маршрутизация текстового ввода по состояниям
+    // --- Маршрутизация ввода текста ---
 
+    /**
+     * Маршрутизатор текстовых сообщений для пошаговых мастера настройки расписания.
+     */
     public boolean handleTextInput(Long telegramId, String text, SessionState state) {
         switch (state) {
             case AWAITING_TEMPLATE_ACTIVATE_DATE -> finishTemplateActivation(telegramId, text);
@@ -414,7 +406,7 @@ public class ScheduleHandler {
     }
 
     /**
-     * Состояния относящиеся к ScheduleHandler — используется MasterHandler для маршрутизации
+     * Вспомогательный метод для внешней проверки: принадлежит ли состояние сессии к сценариям расписания.
      */
     public static boolean isScheduleState(SessionState state) {
         return switch (state) {
@@ -430,23 +422,15 @@ public class ScheduleHandler {
         };
     }
 
+    // --- Вспомогательные методы ---
 
-    // Вспомогательные методы
-
+    /** Безопасный парсер даты из формата "дд.мм.гггг".Возвращает null при ошибке. */
     private LocalDate parseDateOrNull(String text) {
         try {
             return LocalDate.parse(text.trim(), DATE_INPUT_FMT);
         } catch (DateTimeParseException e) {
             return null;
         }
-    }
-
-    private int timeToMinutes(LocalTime time) {
-        return time.getHour() * 60 + time.getMinute();
-    }
-
-    private LocalTime minutesToTime(int minutes) {
-        return LocalTime.of(minutes / 60, minutes % 60);
     }
 
     private InlineKeyboardButton btn(String text, String callbackData) {
