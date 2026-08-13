@@ -38,13 +38,35 @@ import java.time.DayOfWeek;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
+/**
+ * Основной сервис управления записями (бронированиями) в системе GroomBook.
+ * <p>
+ * Отвечает за:
+ * <ul>
+ *   <li>Полный жизненный цикл стандартных записей клиентов (создание, подтверждение, отклонение, отмена, завершение).</li>
+ *   <li>Создание ручных (договорных) записей мастером в обход базовых ограничений и шаблонов.</li>
+ *   <li>Проверку ключевых бизнес-правил: лимиты записей в неделю, временные интервалы отмены/записи, статусы клиентов и питомцев.</li>
+ *   <li>Интеграцию с внешними сервисами: отправку уведомлений через {@link NotificationService} и синхронизацию с Google Calendar через {@link GoogleCalendarService}.</li>
+ * </ul>
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class BookingService {
 
+    /**
+     * Максимальное количество активных бронирований, разрешенное одному клиенту в неделю.
+     */
     private static final int BOOKING_LIMIT_PER_WEEK = 2;
+
+    /**
+     * Минимальное количество часов до начала слота, за которое клиент еще может оформить запись.
+     */
     private static final int MIN_HOURS_BEFORE_BOOKING = 1;
+
+    /**
+     * Минимальный запас времени (в часах) до начала визита, допускающий отмену брони самим клиентом.
+     */
     private static final int MIN_HOURS_BEFORE_CANCEL = 24;
 
     private final BookingRepository bookingRepository;
@@ -57,8 +79,16 @@ public class BookingService {
     // Создание брони клиентом
 
     /**
-     * Стандартное бронирование клиентом через бота.
-     * Статус брони: PENDING — ждёт подтверждения мастера.
+     * Создает стандартную заявку на бронирование от имени клиента через Telegram-бота.
+     * <p>
+     * Выполняет перед сохранением ряд проверок бизнес-правил:
+     * <ul>
+     *   <li>Клиент не заблокирован.</li>
+     *   <li>Питомец активен и ему не отказано в обслуживании.</li>
+     *   <li>Слот свободен и до его начала остается больше {@link #MIN_HOURS_BEFORE_BOOKING} часов.</li>
+     *   <li>Клиент не превысил недельный лимит записей {@link #BOOKING_LIMIT_PER_WEEK}.</li>
+     * </ul>
+     * После успешного создания переводит слот в состояние занятости и отправляет уведомление мастеру.
      */
     @Transactional
     public Booking createBooking(Long telegramId, Long slotId,
@@ -99,10 +129,16 @@ public class BookingService {
     }
 
     /**
-     * Договорная запись — мастер создаёт вручную в любое время,
-     * в том числе в выходные и нерабочие часы.
-     * Статус брони: CONFIRMED сразу, без этапа PENDING.
-     * Клиент НЕ уведомляется — мастер уже договорился лично.
+     * Создает ручную (договорную) запись мастером.
+     * <p>
+     * Отличается от стандартного бронирования следующим:
+     * <ul>
+     *   <li>Может создаваться вне рамок основного шаблона и в нерабочие часы/дни.</li>
+     *   <li>Автоматически генерирует специальный ручной слот {@link SlotStatus#MANUAL_BOOKING}.</li>
+     *   <li>Сразу получает статус {@link BookingStatus#CONFIRMED}.</li>
+     *   <li>Синхронизируется с Google Calendar (ошибки API календарного сервиса логируются без отката транзакции).</li>
+     *   <li>Не отправляет уведомление клиенту, так как предполагается персональная договоренность.</li>
+     * </ul>
      */
     @Transactional
     public Booking createManualBooking(Long clientId, Long petId,
@@ -158,9 +194,10 @@ public class BookingService {
     // Управление статусом брони — действия мастера
 
     /**
-     * Мастер подтверждает бронь.
-     * Бронь: PENDING → CONFIRMED.
-     * Создаётся событие в Google Calendar.
+     * Подтверждает заявку на бронирование мастером.
+     * <p>
+     * Переводит бронь из состояния {@link BookingStatus#PENDING} в {@link BookingStatus#CONFIRMED}.
+     * Экспортирует событие в Google Calendar и отправляет клиенту уведомление с подтверждением.
      */
     @Transactional
     public Booking confirmBooking(Long bookingId) {
@@ -192,9 +229,10 @@ public class BookingService {
     }
 
     /**
-     * Мастер отклоняет заявку клиента.
-     * Бронь: PENDING → CANCELLED_BY_MASTER.
-     * Слот освобождается.
+     * Отклоняет находящуюся на рассмотрении заявку клиента (PENDING).
+     * <p>
+     * Переводит бронь в статус {@link BookingStatus#CANCELLED_BY_MASTER}, освобождает временной слот
+     * и уведомляет клиента с указанием причины отказа.
      */
     @Transactional
     public void rejectBooking(Long bookingId, String reason) {
@@ -217,8 +255,10 @@ public class BookingService {
     }
 
     /**
-     * Мастер отменяет уже подтверждённую бронь.
-     * Слот освобождается, событие удаляется из Google Calendar.
+     * Отменяет мастером ранее уже подтвержденную бронь.
+     * <p>
+     * Освобождает забронированный слот, удаляет соответствующую запись из Google Calendar
+     * и отправляет клиенту уведомление об отмене.
      */
     @Transactional
     public void cancelByMaster(Long bookingId, String reason) {
@@ -238,8 +278,10 @@ public class BookingService {
     }
 
     /**
-     * Мастер завершает визит и оставляет заметку.
-     * Бронь: CONFIRMED → COMPLETED.
+     * Отмечает визит как успешно завершенный.
+     * <p>
+     * Переводит бронь из {@link BookingStatus#CONFIRMED} в статус {@link BookingStatus#COMPLETED}
+     * и сохраняет заметку мастера о проведенной процедуре.
      */
     @Transactional
     public Booking completeBooking(Long bookingId, String masterNote) {
@@ -258,10 +300,10 @@ public class BookingService {
     }
 
     /**
-     * Мастер отмечает что клиент не пришёл без предупреждения.
-     * Бронь: CONFIRMED → NO_SHOW.
-     * Счётчик no_show у клиента увеличивается на 1.
-     * Слот освобождается.
+     * Фиксирует неявку клиента на прием без предварительного предупреждения.
+     * <p>
+     * Переводит статус в {@link BookingStatus#NO_SHOW}, увеличивает персональный счетчик
+     * неявок у клиента на 1, освобождает временной слот и удаляет событие из Google Calendar.
      */
     @Transactional
     public Booking markNoShow(Long bookingId) {
@@ -293,8 +335,15 @@ public class BookingService {
     // Отмена клиентом
 
     /**
-     * Клиент отменяет свою бронь.
-     * Разрешено только если до начала слота больше 24 часов.
+     * Отменяет бронирование по инициативе клиента.
+     * <p>
+     * Отмена разрешается только при соблюдении следующих условий:
+     * <ul>
+     *   <li>Бронь принадлежит клиенту, совершающему запрос.</li>
+     *   <li>До начала приема остается больше регламентированного времени (обычно не менее {@link #MIN_HOURS_BEFORE_CANCEL} часов).</li>
+     * </ul>
+     * При успешной отмене слот возвращается в статус свободного, событие удаляется из Google Calendar,
+     * а мастер получает notification-уведомление.
      */
     @Transactional
     public void cancelByClient(Long bookingId, Long telegramId) {
@@ -326,7 +375,8 @@ public class BookingService {
     // Запросы
 
     /**
-     * Активные брони клиента — для команды /mybookings
+     * Возвращает список всех активных (ожидающих или подтвержденных) бронирований конкретного клиента.
+     * Используется для формирования ответа на команду {@code /mybookings}.
      */
     @Transactional(readOnly = true)
     public List<Booking> getActiveBookingsForClient(Long telegramId) {
@@ -335,7 +385,8 @@ public class BookingService {
     }
 
     /**
-     * Все брони на конкретный день — для команд мастера /today /tomorrow
+     * Возвращает все бронирования на указанный день.
+     * Используется мастером при просмотре расписания на текущий/следующий день (команды {@code /today}, {@code /tomorrow}).
      */
     @Transactional(readOnly = true)
     public List<Booking> getBookingsForDate(LocalDate date) {
@@ -343,7 +394,8 @@ public class BookingService {
     }
 
     /**
-     * Брони попадающие в диапазон — для предупреждения при блокировке отпуска
+     * Находит все активные бронирования в заданной временной рамочной диапазоне.
+     * Служит для проверки накладывающихся записей (например, при блокировке мастером периода отпуска).
      */
     @Transactional(readOnly = true)
     public List<Booking> getActiveBookingsInRange(LocalDate from, LocalDate to) {
@@ -351,7 +403,8 @@ public class BookingService {
     }
 
     /**
-     * Подтверждённые брони на завтра — для планировщика напоминаний
+     * Находит все подтвержденные брони на выбранную дату.
+     * Используется фоновым сервисом/планировщиком рассылки для отправки напоминаний накануне приёма.
      */
     @Transactional(readOnly = true)
     public List<Booking> getConfirmedBookingsForDate(LocalDate date) {
@@ -360,12 +413,18 @@ public class BookingService {
 
     // Приватные методы — валидация и вспомогательная логика
 
+    /**
+     * Проверяет возможность клиента осуществлять бронирование.
+     */
     private void validateClientCanBook(Client client) {
         if (client.isBlocked()) {
             throw new ClientBlockedException(client.getId());
         }
     }
 
+    /**
+     * Проверяет статус питомца перед бронированием.
+     */
     private void validatePetCanBeBooked(Pet pet) {
         if (pet.isRefused()) {
             throw new PetRefusedException(pet.getId());
@@ -375,6 +434,9 @@ public class BookingService {
         }
     }
 
+    /**
+     * Проверяет доступность временного слота.
+     */
     private void validateSlotIsAvailable(TimeSlot slot) {
         if (slot.isBooked()) {
             throw new SlotAlreadyBookedException(slot.getId());
@@ -384,12 +446,18 @@ public class BookingService {
         }
     }
 
+    /**
+     * Проверяет, что запрашиваемый слот наступает не слишком скоро.
+     */
     private void validateSlotIsNotTooSoon(TimeSlot slot) {
         if (!slot.isCancellableByClient(MIN_HOURS_BEFORE_BOOKING)) {
             throw new SlotTooSoonException();
         }
     }
 
+    /**
+     * Проверяет персональный лимит активных броней клиента на текущую календарную неделю.
+     */
     private void validateWeeklyLimit(Long clientId) {
         LocalDateTime weekStart = LocalDateTime.now()
                 .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
@@ -404,6 +472,9 @@ public class BookingService {
         }
     }
 
+    /**
+     * Вспомогательный метод для безопасного удаления связанного события из Google Calendar.
+     */
     private void deleteCalendarEvent(Booking booking) {
         if (booking.getGcalEventId() != null) {
             try {
