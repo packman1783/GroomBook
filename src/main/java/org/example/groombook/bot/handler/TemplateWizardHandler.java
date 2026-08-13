@@ -17,26 +17,18 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
+import java.time.Duration;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 
 /**
  * Wizard пошагового создания шаблона расписания через Telegram-диалог.
- * <p>
- * Шаги:
- * 1. Название (текстовый ввод)
- * 2. Рабочие дни (инлайн-кнопки с тоглами, редактирует одно сообщение)
- * 3. Время начала рабочего дня (кнопки)
- * 4. Время окончания рабочего дня (кнопки)
- * 5. Длительность одного слота (кнопки)
- * 6. Подтверждение с итоговой сводкой (кнопки)
  */
 @Slf4j
 @Component
@@ -48,31 +40,26 @@ public class TemplateWizardHandler {
     private final TelegramClient telegramClient;
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
-
-    /**
-     * Названия дней недели: индекс 1=Пн ... 7=Вс
-     */
     private static final String[] DAY_NAMES = {"", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"};
 
-    // Точка входа
+    // --- Точка входа ---
 
-    /**
-     * Вызывается из ScheduleHandler или MasterHandler при запуске wizard-а
-     */
     public void startWizard(Long telegramId) {
         UserSession session = sessionManager.get(telegramId);
         session.reset();
         session.setPendingTemplateWorkingDays(new HashSet<>());
         session.setState(SessionState.AWAITING_TEMPLATE_NAME);
 
-        send(telegramId,
-                "📋 *Создание шаблона расписания*\n\n" +
-                        "Шаг 1 из 5 — Название\n\n" +
-                        "Введите название шаблона, например:\n" +
-                        "_Стандартный_, _Высокий сезон_, _Зима_");
+        send(telegramId, """
+                📋 Создание шаблона расписания
+
+                Шаг 1 из 5 — Название
+
+                Введите название шаблона, например:
+                Стандартный, Высокий сезон, Зима""");
     }
 
-    // Текстовый ввод (только шаг 1 — название)
+    // --- Текстовый ввод ---
 
     public void handleTextInput(Long telegramId, String text) {
         UserSession session = sessionManager.get(telegramId);
@@ -88,54 +75,42 @@ public class TemplateWizardHandler {
         askForDays(telegramId);
     }
 
-    // Callback-маршрутизация
+    // --- Callback-маршрутизация ---
 
     public void handleCallback(Long telegramId, String data, String callbackId) {
         String prefix = CallbackData.prefix(data);
 
         switch (prefix) {
             case CallbackData.TEMPLATE_TOGGLE_DAY -> handleToggleDay(
-                    telegramId,
-                    Integer.parseInt(CallbackData.payload(data)),
-                    callbackId);
-
+                    telegramId, Integer.parseInt(CallbackData.payload(data)), callbackId);
             case CallbackData.TEMPLATE_DAYS_DONE -> handleDaysDone(telegramId, callbackId);
-
             case CallbackData.TEMPLATE_START_TIME -> handleStartTimeSelected(
                     telegramId, CallbackData.payload(data), callbackId);
-
             case CallbackData.TEMPLATE_END_TIME -> handleEndTimeSelected(
                     telegramId, CallbackData.payload(data), callbackId);
-
             case CallbackData.TEMPLATE_DURATION -> handleDurationSelected(
-                    telegramId,
-                    Integer.parseInt(CallbackData.payload(data)),
-                    callbackId);
-
+                    telegramId, Integer.parseInt(CallbackData.payload(data)), callbackId);
             case CallbackData.TEMPLATE_CONFIRM -> handleConfirm(telegramId, callbackId);
             case CallbackData.TEMPLATE_CANCEL_WIZARD -> handleCancel(telegramId, callbackId);
-
             default -> answerCallback(callbackId, null);
         }
     }
 
-    // Шаг 2 — выбор рабочих дней (тогл-кнопки)
+    // --- Шаг 2: Рабочие дни ---
 
     private void askForDays(Long telegramId) {
         UserSession session = sessionManager.get(telegramId);
         try {
             Message sent = telegramClient.execute(SendMessage.builder()
                     .chatId(telegramId.toString())
-                    .text("Шаг 2 из 5 — Рабочие дни\n\n" +
-                            "Нажмите на день чтобы выбрать или снять. " +
-                            "Затем нажмите *Готово*.")
-                    .parseMode("Markdown")
+                    .text("""
+                            Шаг 2 из 5 — Рабочие дни
+
+                            Нажмите на день чтобы выбрать или снять. Затем нажмите Готово.""")
                     .replyMarkup(buildDaysKeyboard(session))
                     .build());
 
-            // Сохраняем ID сообщения — будем редактировать его при каждом шаге
             session.setPendingTemplateMessageId(sent.getMessageId());
-
         } catch (TelegramApiException e) {
             log.error("Ошибка отправки клавиатуры дней: {}", e.getMessage());
         }
@@ -148,14 +123,12 @@ public class TemplateWizardHandler {
             return;
         }
 
-        // Переключаем выбранный день
         if (session.getPendingTemplateWorkingDays().contains(day)) {
             session.getPendingTemplateWorkingDays().remove(day);
         } else {
             session.getPendingTemplateWorkingDays().add(day);
         }
 
-        // Редактируем то же сообщение — обновляем ✅/☐ без создания нового
         try {
             telegramClient.execute(EditMessageReplyMarkup.builder()
                     .chatId(telegramId.toString())
@@ -182,7 +155,7 @@ public class TemplateWizardHandler {
         askForStartTime(telegramId);
     }
 
-    // Шаг 3 — время начала
+    // --- Шаг 3: Время начала ---
 
     private void askForStartTime(Long telegramId) {
         InlineKeyboardMarkup keyboard = InlineKeyboardMarkup.builder()
@@ -194,10 +167,10 @@ public class TemplateWizardHandler {
                 ))
                 .build();
 
-        send(telegramId,
-                "Шаг 3 из 5 — Начало рабочего дня\n\n" +
-                        "Во сколько начинается рабочий день?",
-                keyboard);
+        send(telegramId, """
+                Шаг 3 из 5 — Начало рабочего дня
+
+                Во сколько начинается рабочий день?""", keyboard);
     }
 
     private void handleStartTimeSelected(Long telegramId, String timeStr, String callbackId) {
@@ -210,7 +183,7 @@ public class TemplateWizardHandler {
         askForEndTime(telegramId);
     }
 
-    // Шаг 4 — время окончания
+    // --- Шаг 4: Время окончания ---
 
     private void askForEndTime(Long telegramId) {
         LocalTime start = sessionManager.get(telegramId).getPendingTemplateStartTime();
@@ -225,11 +198,11 @@ public class TemplateWizardHandler {
                 ))
                 .build();
 
-        send(telegramId,
-                "Шаг 4 из 5 — Конец рабочего дня\n\n" +
-                        "Начало: " + start.format(TIME_FMT) + "\n" +
-                        "Во сколько заканчивается рабочий день?",
-                keyboard);
+        send(telegramId, String.format("""
+                Шаг 4 из 5 — Конец рабочего дня
+
+                Начало: %s
+                Во сколько заканчивается рабочий день?""", start.format(TIME_FMT)), keyboard);
     }
 
     private void handleEndTimeSelected(Long telegramId, String timeStr, String callbackId) {
@@ -247,7 +220,7 @@ public class TemplateWizardHandler {
         askForDuration(telegramId);
     }
 
-    // Шаг 5 — длительность слота
+    // --- Шаг 5: Длительность слота ---
 
     private void askForDuration(Long telegramId) {
         UserSession session = sessionManager.get(telegramId);
@@ -262,11 +235,11 @@ public class TemplateWizardHandler {
                 ))
                 .build();
 
-        send(telegramId,
-                "Шаг 5 из 5 — Длительность одного слота\n\n" +
-                        "Время работы: " + start.format(TIME_FMT) + " – " + end.format(TIME_FMT) + "\n" +
-                        "Сколько времени занимает одна стрижка?",
-                keyboard);
+        send(telegramId, String.format("""
+                Шаг 5 из 5 — Длительность одного слота
+
+                Время работы: %s – %s
+                Сколько времени занимает одна стрижка?""", start.format(TIME_FMT), end.format(TIME_FMT)), keyboard);
     }
 
     private void handleDurationSelected(Long telegramId, int hours, String callbackId) {
@@ -278,32 +251,32 @@ public class TemplateWizardHandler {
         showConfirmation(telegramId);
     }
 
-    // Итоговая сводка и подтверждение
+    // --- Сводка и создание ---
 
     private void showConfirmation(Long telegramId) {
         UserSession session = sessionManager.get(telegramId);
 
-        // Рабочие дни — отсортированные названия через запятую
         String workingDaysStr = session.getPendingTemplateWorkingDays().stream()
                 .sorted()
                 .map(d -> DAY_NAMES[d])
                 .reduce((a, b) -> a + ", " + b)
                 .orElse("—");
 
-        // Количество слотов в рабочий день
-        long totalMinutes = java.time.Duration.between(
+        long totalMinutes = Duration.between(
                 session.getPendingTemplateStartTime(),
                 session.getPendingTemplateEndTime()).toMinutes();
         int slotsPerDay = (int) (totalMinutes / (session.getPendingTemplateSlotDuration() * 60));
 
-        String summary = String.format(
-                "📋 *Новый шаблон расписания*\n\n" +
-                        "Название: *%s*\n" +
-                        "Рабочие дни: %s\n" +
-                        "Время работы: %s – %s\n" +
-                        "Длительность слота: %d ч.\n" +
-                        "Слотов в рабочий день: *%d*\n\n" +
-                        "Всё верно?",
+        String summary = String.format("""
+                        📋 Новый шаблон расписания
+
+                        Название: %s
+                        Рабочие дни: %s
+                        Время работы: %s – %s
+                        Длительность слота: %d ч.
+                        Слотов в рабочий день: %d
+
+                        Всё верно?""",
                 session.getPendingTemplateName(),
                 workingDaysStr,
                 session.getPendingTemplateStartTime().format(TIME_FMT),
@@ -333,10 +306,9 @@ public class TemplateWizardHandler {
                     session.getPendingTemplateStartTime(),
                     session.getPendingTemplateEndTime());
 
-            send(telegramId,
-                    "✅ Шаблон *" + escapeMarkdown(template.getName()) + "* создан\\!\n\n" +
-                            "Шаблон пока неактивен\\. Чтобы активировать — отправьте /schedule → " +
-                            "Шаблоны и выберите его из списка\\.");
+            send(telegramId, "✅ Шаблон \"" + template.getName() + "\" создан!\n\n" +
+                    "Шаблон пока неактивен. Чтобы активировать — отправьте /schedule → " +
+                    "Шаблоны и выберите его из списка.");
 
         } catch (Exception e) {
             log.error("Ошибка создания шаблона для мастера {}: {}", telegramId, e.getMessage());
@@ -352,11 +324,8 @@ public class TemplateWizardHandler {
         send(telegramId, "Создание шаблона отменено.");
     }
 
-    // Маршрутизация из MasterHandler
+    // --- Маршрутизация состояния ---
 
-    /**
-     * Все состояния которые обрабатывает этот wizard
-     */
     public static boolean isWizardState(SessionState state) {
         return switch (state) {
             case AWAITING_TEMPLATE_NAME,
@@ -369,9 +338,6 @@ public class TemplateWizardHandler {
         };
     }
 
-    /**
-     * Callback-префиксы которые принадлежат этому wizard-у
-     */
     public static boolean isWizardCallback(String prefix) {
         return switch (prefix) {
             case CallbackData.TEMPLATE_NEW,
@@ -386,12 +352,8 @@ public class TemplateWizardHandler {
         };
     }
 
-    // Построение клавиатур
+    // --- Построение клавиатур ---
 
-    /**
-     * Клавиатура выбора дней — 7 кнопок + "Готово".
-     * Каждый клик на день редактирует это же сообщение через EditMessageReplyMarkup.
-     */
     private InlineKeyboardMarkup buildDaysKeyboard(UserSession session) {
         var builder = InlineKeyboardMarkup.builder();
 
@@ -411,7 +373,7 @@ public class TemplateWizardHandler {
         return builder.build();
     }
 
-    // Вспомогательные методы
+    // --- Вспомогательные методы ---
 
     private InlineKeyboardButton timeBtn(String time, String prefix) {
         return btn(time, CallbackData.build(prefix, time));
@@ -433,7 +395,6 @@ public class TemplateWizardHandler {
             telegramClient.execute(SendMessage.builder()
                     .chatId(chatId.toString())
                     .text(text)
-                    .parseMode("Markdown")
                     .replyMarkup(keyboard)
                     .build());
         } catch (TelegramApiException e) {
@@ -450,10 +411,5 @@ public class TemplateWizardHandler {
         } catch (TelegramApiException e) {
             log.warn("Ошибка ответа на callback {}: {}", callbackId, e.getMessage());
         }
-    }
-
-    private String escapeMarkdown(String text) {
-        if (text == null) return "";
-        return text.replaceAll("([_*\\[\\]()~`>#+\\-=|{}.!])", "\\\\$1");
     }
 }
