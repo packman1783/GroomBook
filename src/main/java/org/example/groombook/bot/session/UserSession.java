@@ -2,20 +2,14 @@ package org.example.groombook.bot.session;
 
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Состояние диалога с конкретным пользователем + временные данные
- * накопленные в процессе многошагового сценария.
- * <p>
- * Пример сценария бронирования:
- * 1. Пользователь выбрал дату    → pendingDate = ...
- * 2. Пользователь выбрал слот    → pendingSlotId = ...
- * 3. Пользователь выбрал питомца → pendingPetId = ...
- * 4. Состояние → AWAITING_BOOKING_COMMENT
- * 5. Пользователь написал комментарий → создаём бронь, сбрасываем сессию
+ * Состояние диалога с конкретным пользователем и временные данные
+ * многошаговых сценариев.
  */
 @Data
 public class UserSession {
@@ -33,29 +27,31 @@ public class UserSession {
     private Long pendingSlotId;
     private Long pendingPetId;
 
-    // Действия требующие ID существующей сущности + последующий текстовый ввод
+    // Действия мастера
     private Long pendingBookingId;
     private Long pendingClientId;
+    private Long pendingTemplateId;
 
     // Блокировка слота
-    private java.time.LocalDate pendingBlockDate;
+    private LocalDate pendingBlockDate;
     private Long pendingBlockSlotId;
 
     // Договорная запись
     private Long pendingManualClientId;
     private Long pendingManualPetId;
-    private java.time.LocalDate pendingManualDate;
+    private LocalDate pendingManualDate;
+    private LocalTime pendingManualTime;
 
     // Wizard создания шаблона
     private String pendingTemplateName;
-    private Set<Integer> pendingTemplateWorkingDays;
+    private Set<Integer> pendingTemplateWorkingDays = new HashSet<>();
     private LocalTime pendingTemplateStartTime;
     private LocalTime pendingTemplateEndTime;
     private Integer pendingTemplateSlotDuration;
-    private Integer pendingTemplateMessageId; // ID сообщения с кнопками дней для редактирования
+    private Integer pendingTemplateMessageId;
 
     /**
-     * Сброс состояния после завершения или отмены сценария
+     * Сброс состояния после завершения или отмены сценария.
      */
     public void reset() {
         this.state = SessionState.NONE;
@@ -66,11 +62,13 @@ public class UserSession {
         this.pendingPetId = null;
         this.pendingBookingId = null;
         this.pendingClientId = null;
+        this.pendingTemplateId = null;
         this.pendingBlockDate = null;
         this.pendingBlockSlotId = null;
         this.pendingManualClientId = null;
         this.pendingManualPetId = null;
         this.pendingManualDate = null;
+        this.pendingManualTime = null;
         this.pendingTemplateName = null;
         this.pendingTemplateWorkingDays = new HashSet<>();
         this.pendingTemplateStartTime = null;
