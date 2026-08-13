@@ -298,9 +298,11 @@ public class ClientHandler {
         try {
             clientService.getOrCreateClient(telegramId, session.getPendingName(), phone);
             session.reset();
-            send(telegramId, "✅ Регистрация завершена!\n\n" +
-                    "Теперь добавьте питомца командой /addpet, " +
-                    "а затем записывайтесь на стрижку через /book.");
+            send(telegramId, """
+                    ✅ Регистрация завершена!
+                    
+                    Теперь добавьте питомца командой /addpet, \
+                    а затем записывайтесь на стрижку через /book.""");
         } catch (PhoneAlreadyRegisteredException e) {
             send(telegramId, "Этот номер телефона уже зарегистрирован. " +
                     "Если это ваш номер — свяжитесь с мастером напрямую.");
