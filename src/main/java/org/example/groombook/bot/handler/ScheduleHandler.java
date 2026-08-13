@@ -117,8 +117,10 @@ public class ScheduleHandler {
 
         if (templates.isEmpty()) {
             send(telegramId,
-                    "Шаблонов расписания пока нет.\n\n" +
-                            "Нажмите кнопку ниже чтобы создать первый шаблон через удобный диалог:",
+                    """
+                            Шаблонов расписания пока нет.
+                            
+                            Нажмите кнопку ниже чтобы создать первый шаблон через удобный диалог:""",
                     InlineKeyboardMarkup.builder()
                             .keyboardRow(new InlineKeyboardRow(btn("➕ Создать шаблон", CallbackData.TEMPLATE_NEW)))
                             .build());
