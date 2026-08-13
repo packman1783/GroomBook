@@ -8,7 +8,14 @@ import org.example.groombook.bot.session.SessionManager;
 import org.example.groombook.bot.session.SessionState;
 import org.example.groombook.bot.session.UserSession;
 import org.example.groombook.bot.util.CallbackData;
-import org.example.groombook.exception.*;
+import org.example.groombook.exception.BookingLimitExceededException;
+import org.example.groombook.exception.CancellationTooLateException;
+import org.example.groombook.exception.ClientBlockedException;
+import org.example.groombook.exception.GroomBookException;
+import org.example.groombook.exception.PetRefusedException;
+import org.example.groombook.exception.PhoneAlreadyRegisteredException;
+import org.example.groombook.exception.SlotAlreadyBookedException;
+import org.example.groombook.exception.SlotTooSoonException;
 import org.example.groombook.model.Booking;
 import org.example.groombook.model.Pet;
 import org.example.groombook.model.TimeSlot;
@@ -29,6 +36,17 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+/**
+ * Хэндлер взаимодействия с клиентами груминг-салона.
+ * <p>
+ * Отвечает за:
+ * <ul>
+ *   <li>Первичную регистрацию (имя, номер телефона)</li>
+ *   <li>Добавление питомцев пользователя</li>
+ *   <li>Пошаговый мастер записи на услугу (выбор даты -> слота -> питомца -> комментарий)</li>
+ *   <li>Просмотр и отмену собственных активных броней</li>
+ * </ul>
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -41,11 +59,17 @@ public class ClientHandler {
     private final InlineKeyboardFactory keyboards;
     private final TelegramClient telegramClient;
 
+    /** Формат даты для отображения клиенту (например, "15 мая"). */
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("d MMMM");
+
+    /** Формат времени для отображения слотов (например, "14:30"). */
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
-    // Команды
+    // --- Обработка команд ---
 
+    /**
+     * Точка входа для обработки текстовых команд клиента (начинающихся с "/").
+     */
     public void handleCommand(Long telegramId, String text) {
         String command = text.split("\\s+")[0].toLowerCase();
 
@@ -58,13 +82,19 @@ public class ClientHandler {
         }
     }
 
+    /**
+     * Обрабатывает нераспознанный текстовый ввод вне контекста активного шага мастера (FSM).
+     */
     public void handleUnrecognizedText(Long telegramId) {
         send(telegramId, "Не понимаю это сообщение. Используйте /book чтобы записаться " +
                 "или /mybookings чтобы посмотреть свои записи.");
     }
 
-    // /start — регистрация нового клиента
+    // --- Сценарии команд ---
 
+    /**
+     * Старт работы с ботом: проверка регистрации и запуск мастера знакомства.
+     */
     private void handleStart(Long telegramId) {
         if (clientService.isRegistered(telegramId)) {
             send(telegramId, "Привет! Чтобы записаться, используйте /book.\n" +
@@ -77,8 +107,9 @@ public class ClientHandler {
         send(telegramId, "Добро пожаловать! 🐾 Для начала, как вас зовут?");
     }
 
-    // /addpet — добавление питомца
-
+    /**
+     * Запуск процесса добавления нового питомца.
+     */
     private void handleAddPetStart(Long telegramId) {
         if (!clientService.isRegistered(telegramId)) {
             send(telegramId, "Сначала нужно зарегистрироваться — отправьте /start");
@@ -88,8 +119,9 @@ public class ClientHandler {
         send(telegramId, "Как зовут питомца?");
     }
 
-    // /book — бронирование
-
+    /**
+     * Начало диалога онлайн-записи: отображение клавиатуры с доступными датами.
+     */
     private void handleBookStart(Long telegramId) {
         if (!clientService.isRegistered(telegramId)) {
             send(telegramId, "Сначала нужно зарегистрироваться — отправьте /start");
@@ -105,6 +137,9 @@ public class ClientHandler {
         send(telegramId, "Выберите дату:", keyboards.datesKeyboard(dates));
     }
 
+    /**
+     * Обработка выбора даты клиентом: вывод свободных временных слотов.
+     */
     private void handleDateSelected(Long telegramId, LocalDate date, String callbackId) {
         List<TimeSlot> slots = scheduleService.getAvailableSlots(date);
         answerCallback(callbackId, null);
@@ -114,10 +149,12 @@ public class ClientHandler {
             return;
         }
 
-        send(telegramId, "Выберите время на " + date.format(DATE_FMT) + ":",
-                keyboards.slotsKeyboard(slots));
+        send(telegramId, "Выберите время на " + date.format(DATE_FMT) + ":", keyboards.slotsKeyboard(slots));
     }
 
+    /**
+     * Обработка выбора слота: вывод списка питомцев клиента для привязки визита.
+     */
     private void handleSlotSelected(Long telegramId, Long slotId, String callbackId) {
         answerCallback(callbackId, null);
 
@@ -132,6 +169,9 @@ public class ClientHandler {
         send(telegramId, "Для какого питомца запись?", keyboards.petsKeyboard(pets));
     }
 
+    /**
+     * Обработка выбора питомца: переход к этапу ввода комментария.
+     */
     private void handlePetSelectedForBooking(Long telegramId, Long petId, String callbackId) {
         answerCallback(callbackId, null);
 
@@ -143,14 +183,15 @@ public class ClientHandler {
                 "или отправьте \"-\" чтобы пропустить.");
     }
 
+    /**
+     * Завершение мастера записи: вызов бизнес-логики создания записи и обработка возможных ошибок.
+     */
     private void finishBooking(Long telegramId, String commentText) {
         UserSession session = sessionManager.get(telegramId);
-        String comment = commentText.equals("-") ? null : commentText;
+        String comment = "-".equals(commentText) ? null : commentText;
 
         try {
-            bookingService.createBooking(telegramId, session.getPendingSlotId(),
-                    session.getPendingPetId(), comment);
-
+            bookingService.createBooking(telegramId, session.getPendingSlotId(), session.getPendingPetId(), comment);
             send(telegramId, "✅ Заявка отправлена! Мастер подтвердит запись в ближайшее время.");
         } catch (BookingLimitExceededException e) {
             send(telegramId, "На этой неделе вы уже записаны максимальное количество раз (2). " +
@@ -173,8 +214,9 @@ public class ClientHandler {
         }
     }
 
-    // /mybookings — список и отмена
-
+    /**
+     * Просмотр списка активных (подтвержденных и ожидающих) бронирований текущего клиента.
+     */
     private void handleMyBookings(Long telegramId) {
         List<Booking> bookings = bookingService.getActiveBookingsForClient(telegramId);
 
@@ -198,11 +240,17 @@ public class ClientHandler {
         }
     }
 
+    /**
+     * Запрос на отмену записи: отправка инлайн-кнопок для подтверждения действия.
+     */
     private void handleCancelRequest(Long telegramId, Long bookingId, String callbackId) {
         answerCallback(callbackId, null);
         send(telegramId, "Подтвердите отмену записи:", keyboards.confirmCancelKeyboard(bookingId));
     }
 
+    /**
+     * Окончательное подтверждение отмены записи со стороны клиента.
+     */
     private void handleCancelConfirmed(Long telegramId, Long bookingId, String callbackId) {
         try {
             bookingService.cancelByClient(bookingId, telegramId);
@@ -218,8 +266,11 @@ public class ClientHandler {
         }
     }
 
-    // Многошаговые текстовые сценарии
+    // --- Многошаговый текстовый ввод ---
 
+    /**
+     * Обработка пользовательского текстового ввода в зависимости от текущего состояния сессии.
+     */
     public void handleTextInput(Long telegramId, String text, SessionState state) {
         UserSession session = sessionManager.get(telegramId);
 
@@ -240,6 +291,9 @@ public class ClientHandler {
         }
     }
 
+    /**
+     * Финализация ввода номера телефона и попытка создания нового клиента в БД.
+     */
     private void handlePhoneEntered(Long telegramId, String phone, UserSession session) {
         try {
             clientService.getOrCreateClient(telegramId, session.getPendingName(), phone);
@@ -254,39 +308,32 @@ public class ClientHandler {
         }
     }
 
-    // Callback-кнопки
+    // --- Обработка callbacks ---
 
+    /**
+     * Диспетчеризация callback-запросов (нажатий на инлайн-кнопки) от клиентов.
+     */
     public void handleCallback(Long telegramId, String data, String callbackId) {
         String prefix = CallbackData.prefix(data);
 
         switch (prefix) {
-            case CallbackData.BOOK_DATE -> handleDateSelected(telegramId,
-                    LocalDate.parse(CallbackData.payload(data)), callbackId);
-
-            case CallbackData.BOOK_SLOT -> handleSlotSelected(telegramId,
-                    CallbackData.payloadAsLong(data), callbackId);
-
-            case CallbackData.BOOK_PET -> handlePetSelectedForBooking(telegramId,
-                    CallbackData.payloadAsLong(data), callbackId);
-
-            case CallbackData.PET_TYPE -> handlePetTypeSelected(telegramId,
-                    CallbackData.payload(data), callbackId);
-
-            case CallbackData.CANCEL_BOOKING -> handleCancelRequest(telegramId,
-                    CallbackData.payloadAsLong(data), callbackId);
-
-            case CallbackData.CANCEL_CONFIRM -> handleCancelConfirmed(telegramId,
-                    CallbackData.payloadAsLong(data), callbackId);
-
+            case CallbackData.BOOK_DATE -> handleDateSelected(telegramId, LocalDate.parse(CallbackData.payload(data)), callbackId);
+            case CallbackData.BOOK_SLOT -> handleSlotSelected(telegramId, CallbackData.payloadAsLong(data), callbackId);
+            case CallbackData.BOOK_PET -> handlePetSelectedForBooking(telegramId, CallbackData.payloadAsLong(data), callbackId);
+            case CallbackData.PET_TYPE -> handlePetTypeSelected(telegramId, CallbackData.payload(data), callbackId);
+            case CallbackData.CANCEL_BOOKING -> handleCancelRequest(telegramId, CallbackData.payloadAsLong(data), callbackId);
+            case CallbackData.CANCEL_CONFIRM -> handleCancelConfirmed(telegramId, CallbackData.payloadAsLong(data), callbackId);
             case CallbackData.CANCEL_ABORT -> {
                 answerCallback(callbackId, "Отменено");
                 send(telegramId, "Хорошо, запись остаётся в силе.");
             }
-
             default -> answerCallback(callbackId, null);
         }
     }
 
+    /**
+     * Обработка выбора типа питомца (собака, кошка и т.д.) при создании карточки питомца.
+     */
     private void handlePetTypeSelected(Long telegramId, String typeStr, String callbackId) {
         answerCallback(callbackId, null);
 
@@ -296,16 +343,21 @@ public class ClientHandler {
         Pet pet = clientService.addPet(telegramId, session.getPendingPetName(), type, null);
         session.reset();
 
-        send(telegramId, "🎉 Питомец \"" + pet.getName() + "\" добавлен! " +
-                "Теперь можно записаться через /book.");
+        send(telegramId, "🎉 Питомец \"" + pet.getName() + "\" добавлен!Теперь можно записаться через /book.");
     }
 
-    // Вспомогательные методы отправки
+    // --- Вспомогательные методы отправки ---
 
+    /**
+     * Отправляет обычное текстовое сообщение пользователю.
+     */
     private void send(Long chatId, String text) {
         send(chatId, text, null);
     }
 
+    /**
+     * Отправляет текстовое сообщение пользователю с прикрепленной инлайн-клавиатурой.
+     */
     private void send(Long chatId, String text, InlineKeyboardMarkup keyboard) {
         SendMessage message = SendMessage.builder()
                 .chatId(chatId.toString())
@@ -319,6 +371,9 @@ public class ClientHandler {
         }
     }
 
+    /**
+     * Отправляет всплывающее уведомление или снимает состояние ожидания у кнопки (AnswerCallbackQuery).
+     */
     private void answerCallback(String callbackId, String text) {
         AnswerCallbackQuery answer = AnswerCallbackQuery.builder()
                 .callbackQueryId(callbackId)
