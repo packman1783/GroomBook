@@ -38,6 +38,9 @@ dependencies {
     implementation 'com.google.apis:google-api-services-calendar:v3-rev20260225-2.0.0'
     implementation 'com.google.auth:google-auth-library-oauth2-http:1.23.0'
 
+    // .env library
+    implementation 'io.github.cdimascio:dotenv-java:3.0.0'
+
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
@@ -67,5 +70,8 @@ tasks.register('integrationTest', Test) {
     group = 'verification'
     description = 'Запускает интеграционные тесты (требует Docker)'
     shouldRunAfter test
-}
 
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    dependsOn testClasses
+}
