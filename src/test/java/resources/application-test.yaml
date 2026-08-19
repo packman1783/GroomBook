@@ -1,8 +1,6 @@
 spring:
   datasource:
-    # URL подставляется Testcontainers динамически через @DynamicPropertySource
-    url: jdbc:tc:postgresql:16-alpine:///groombook
-    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    # URL подставляется Testcontainers динамически через @DynamicPropertySource в BaseRepositoryTest
     username: postgres
     password: postgres
   jpa:
