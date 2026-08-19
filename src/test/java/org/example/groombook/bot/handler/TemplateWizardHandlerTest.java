@@ -152,6 +152,21 @@ class TemplateWizardHandlerTest {
         }
     }
 
+    @Nested
+    @DisplayName("handleCallback — маршрутизация")
+    class HandleCallbackRouting {
+
+        @Test
+        @DisplayName("✅ TEMPLATE_NEW → запуск визарда")
+        void handleCallback_templateNew_startsWizard() throws TelegramApiException {
+            wizardHandler.handleCallback(TELEGRAM_ID, CallbackData.TEMPLATE_NEW, CALLBACK_ID);
+
+            assertThat(session.getState()).isEqualTo(SessionState.AWAITING_TEMPLATE_NAME);
+            verify(telegramClient).execute(any(AnswerCallbackQuery.class));
+            verify(telegramClient).execute(any(SendMessage.class));
+        }
+    }
+
     // handleCallback — тогл дней (шаг 2)
 
     @Nested
