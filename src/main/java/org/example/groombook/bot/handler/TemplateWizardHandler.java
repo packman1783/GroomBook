@@ -81,6 +81,10 @@ public class TemplateWizardHandler {
         String prefix = CallbackData.prefix(data);
 
         switch (prefix) {
+            case CallbackData.TEMPLATE_NEW -> {
+                answerCallback(callbackId, null);
+                startWizard(telegramId);
+            }
             case CallbackData.TEMPLATE_TOGGLE_DAY -> handleToggleDay(
                     telegramId, Integer.parseInt(CallbackData.payload(data)), callbackId);
             case CallbackData.TEMPLATE_DAYS_DONE -> handleDaysDone(telegramId, callbackId);
