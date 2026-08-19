@@ -26,12 +26,15 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Tag("integration")
 public abstract class BaseRepositoryTest {
 
-    @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("groombook")
             .withUsername("postgres")
             .withPassword("postgres")
-            .withReuse(true); // переиспользовать контейнер между тестами
+            .withReuse(true);
+
+    static {
+        POSTGRES.start();
+    }
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
