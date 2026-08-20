@@ -34,19 +34,38 @@ public class InlineKeyboardFactory {
                 .map(date -> new InlineKeyboardRow(button(formatDateLabel(date),
                         CallbackData.build(CallbackData.BOOK_DATE, date))))
                 .collect(Collectors.toList());
+        
+        rows.add(new InlineKeyboardRow(button("❌ Отмена", CallbackData.BOOK_CANCEL)));
+        
         return InlineKeyboardMarkup.builder().keyboard(rows).build();
     }
 
     /**
-     * Клавиатура выбора слота на дату — формат "11:00–13:00"
+     * Клавиатура выбора слота на дату — по 2 слота в ряд для компактности
      */
     public InlineKeyboardMarkup slotsKeyboard(List<TimeSlot> slots) {
-        var rows = slots.stream()
-                .map(slot -> new InlineKeyboardRow(button(
-                        slot.getStartTime().format(TIME_FMT) + "–" + slot.getEndTime().format(TIME_FMT),
-                        CallbackData.build(CallbackData.BOOK_SLOT, slot.getId()))))
-                .collect(Collectors.toList());
-        return InlineKeyboardMarkup.builder().keyboard(rows).build();
+        var builder = InlineKeyboardMarkup.builder();
+        
+        for (int i = 0; i < slots.size(); i += 2) {
+            var btn1 = button(formatSlotLabel(slots.get(i)),
+                    CallbackData.build(CallbackData.BOOK_SLOT, slots.get(i).getId()));
+            
+            if (i + 1 < slots.size()) {
+                var btn2 = button(formatSlotLabel(slots.get(i+1)),
+                        CallbackData.build(CallbackData.BOOK_SLOT, slots.get(i+1).getId()));
+                builder.keyboardRow(new InlineKeyboardRow(btn1, btn2));
+            } else {
+                builder.keyboardRow(new InlineKeyboardRow(btn1));
+            }
+        }
+        
+        builder.keyboardRow(new InlineKeyboardRow(button("❌ Отмена", CallbackData.BOOK_CANCEL)));
+        
+        return builder.build();
+    }
+
+    private String formatSlotLabel(TimeSlot slot) {
+        return slot.getStartTime().format(TIME_FMT) + "–" + slot.getEndTime().format(TIME_FMT);
     }
 
     /**
@@ -57,6 +76,9 @@ public class InlineKeyboardFactory {
                 .map(pet -> new InlineKeyboardRow(button(petEmoji(pet) + " " + pet.getName(),
                         CallbackData.build(CallbackData.BOOK_PET, pet.getId()))))
                 .collect(Collectors.toList());
+        
+        rows.add(new InlineKeyboardRow(button("❌ Отмена", CallbackData.BOOK_CANCEL)));
+        
         return InlineKeyboardMarkup.builder().keyboard(rows).build();
     }
 

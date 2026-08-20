@@ -20,6 +20,7 @@ public final class CallbackData {
     public static final String CANCEL_BOOKING = "CANCEL_BOOKING";
     public static final String CANCEL_CONFIRM = "CANCEL_CONFIRM";
     public static final String CANCEL_ABORT = "CANCEL_ABORT";
+    public static final String BOOK_CANCEL = "BOOK_CANCEL";
 
     // ── Сценарии мастера ───────────────────────────────────────────────────────
     public static final String CONFIRM_BOOKING = "CONFIRM_BOOKING";

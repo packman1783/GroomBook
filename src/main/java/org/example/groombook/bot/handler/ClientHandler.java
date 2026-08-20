@@ -78,8 +78,36 @@ public class ClientHandler {
             case "/book" -> handleBookStart(telegramId);
             case "/mybookings" -> handleMyBookings(telegramId);
             case "/addpet" -> handleAddPetStart(telegramId);
-            default -> send(telegramId, "Не знаю такую команду. Доступно: /book, /mybookings, /addpet");
+            case "/help" -> handleHelp(telegramId);
+            default -> send(telegramId, "Не знаю такую команду. Попробуйте /help для списка команд.");
         }
+    }
+
+    /**
+     * Выводит справку по командам бота для клиента.
+     */
+    private void handleHelp(Long telegramId) {
+        String helpText = """
+                🐾 *Справка по GroomBook* 🐾
+                
+                Я помогу вам записаться к грумеру быстро и удобно!
+                
+                *Доступные команды:*
+                /book — Выбрать дату и время для записи
+                /mybookings — Посмотреть ваши активные записи или отменить их
+                /addpet — Добавить нового питомца в профиль
+                /help — Показать это сообщение
+                /start — Начало работы / Регистрация
+                
+                *Как это работает:*
+                1. Зарегистрируйтесь при первом входе.
+                2. Добавьте одного или нескольких питомцев через /addpet.
+                3. Выберите удобное время через /book.
+                4. Дождитесь подтверждения от мастера (вам придёт уведомление).
+                
+                Если у вас возникли вопросы или нужно перенести запись менее чем за 24 часа, пожалуйста, свяжитесь с мастером напрямую.
+                """;
+        send(telegramId, helpText);
     }
 
     /**
@@ -97,14 +125,26 @@ public class ClientHandler {
      */
     private void handleStart(Long telegramId) {
         if (clientService.isRegistered(telegramId)) {
-            send(telegramId, "Привет! Чтобы записаться, используйте /book.\n" +
-                    "Посмотреть свои записи — /mybookings.");
+            send(telegramId, """
+                    Привет! 👋 Рады видеть вас снова.
+                    
+                    Чтобы записаться на груминг, используйте команду /book.
+                    Посмотреть свои записи — /mybookings.
+                    Если нужна помощь — /help.
+                    """);
             return;
         }
 
         UserSession session = sessionManager.get(telegramId);
         session.setState(SessionState.AWAITING_NAME);
-        send(telegramId, "Добро пожаловать! 🐾 Для начала, как вас зовут?");
+        send(telegramId, """
+                Добро пожаловать в GroomBook! 🐾
+                
+                Я помогу вам записать вашего питомца к грумеру. 
+                Для начала давайте познакомимся.
+                
+                Как вас зовут? (Введите имя)
+                """);
     }
 
     /**
@@ -191,8 +231,22 @@ public class ClientHandler {
         String comment = "-".equals(commentText) ? null : commentText;
 
         try {
-            bookingService.createBooking(telegramId, session.getPendingSlotId(), session.getPendingPetId(), comment);
-            send(telegramId, "✅ Заявка отправлена! Мастер подтвердит запись в ближайшее время.");
+            Booking booking = bookingService.createBooking(telegramId, session.getPendingSlotId(), session.getPendingPetId(), comment);
+            
+            String successMsg = String.format("""
+                    ✅ Заявка отправлена! 
+                    
+                    *Детали записи:*
+                    📅 Дата: %s
+                    ⏰ Время: %s
+                    🐾 Питомец: %s
+                    
+                    Мастер подтвердит запись в ближайшее время. Вы получите уведомление!""",
+                    booking.getSlot().getDate().format(DATE_FMT),
+                    booking.getSlot().getStartTime().format(TIME_FMT),
+                    booking.getPet().getName());
+            
+            send(telegramId, successMsg);
         } catch (BookingLimitExceededException e) {
             send(telegramId, "На этой неделе вы уже записаны максимальное количество раз (2). " +
                     "Попробуйте выбрать слот на следующей неделе.");
@@ -328,6 +382,11 @@ public class ClientHandler {
             case CallbackData.CANCEL_ABORT -> {
                 answerCallback(callbackId, "Отменено");
                 send(telegramId, "Хорошо, запись остаётся в силе.");
+            }
+            case CallbackData.BOOK_CANCEL -> {
+                answerCallback(callbackId, "Запись отменена");
+                sessionManager.clear(telegramId);
+                send(telegramId, "Запись прервана. Если передумаете — используйте /book снова.");
             }
             default -> answerCallback(callbackId, null);
         }
