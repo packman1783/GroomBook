@@ -71,6 +71,7 @@ public class MasterHandler {
             case "/vacation" -> scheduleHandler.handleVacationCommand(telegramId);
             case "/manual" -> scheduleHandler.handleManualCommand(telegramId);
             case "/newtemplate" -> templateWizardHandler.startWizard(telegramId);
+            case "/blocked" -> showBlockedClients(telegramId);
             case "/help" -> handleHelp(telegramId);
             default -> send(telegramId, "Неизвестная команда. Введите /help для просмотра списка команд.");
         }
@@ -98,6 +99,7 @@ public class MasterHandler {
                 /newtemplate — Создать новый недельный график работы
                 /vacation — Заблокировать диапазон дат (отпуск/выходные)
                 /manual — Записать клиента вручную (через выбор из базы)
+                /blocked — Список заблокированных клиентов
                 
                 *Совет:* Для подтверждения или отмены записи используйте кнопки под сообщениями о новых заявках.
                 """;
@@ -177,6 +179,7 @@ public class MasterHandler {
             case CallbackData.COMPLETE_BOOKING -> handleCompleteRequest(telegramId, CallbackData.payloadAsLong(data), callbackId);
             case CallbackData.NO_SHOW_BOOKING -> handleNoShow(telegramId, CallbackData.payloadAsLong(data), callbackId);
             case CallbackData.BLOCK_CLIENT -> handleBlockClientRequest(telegramId, CallbackData.payloadAsLong(data), callbackId);
+            case CallbackData.UNBLOCK_CLIENT -> handleUnblockClient(telegramId, CallbackData.payloadAsLong(data), callbackId);
 
             // Перенаправление события в хэндлер расписания
             case CallbackData.SCHEDULE_TEMPLATES,
@@ -303,6 +306,53 @@ public class MasterHandler {
             send(telegramId, "Укажите причину блокировки клиента (клиент её не увидит):");
         } catch (GroomBookException e) {
             send(telegramId, "Ошибка: " + e.getMessage());
+        }
+    }
+
+    /** Просмотр списка заблокированных клиентов. */
+    private void showBlockedClients(Long telegramId) {
+        List<org.example.groombook.model.Client> blockedClients = clientService.getAllClients().stream()
+                .filter(org.example.groombook.model.Client::isBlocked)
+                .toList();
+
+        if (blockedClients.isEmpty()) {
+            send(telegramId, "Заблокированных клиентов нет.");
+            return;
+        }
+
+        send(telegramId, "🚫 *Заблокированные клиенты:*");
+
+        for (org.example.groombook.model.Client client : blockedClients) {
+            String msgText = String.format("""
+                            👤 *%s*
+                            📞 %s
+                            📝 Причина: %s""",
+                    client.getName(),
+                    client.getPhone(),
+                    client.getStatusReason() != null ? client.getStatusReason() : "не указана"
+            );
+
+            InlineKeyboardMarkup kb = InlineKeyboardMarkup.builder()
+                    .keyboardRow(new InlineKeyboardRow(
+                            btn("🔓 Разблокировать", CallbackData.build(CallbackData.UNBLOCK_CLIENT, client.getId()))
+                    ))
+                    .build();
+
+            send(telegramId, msgText, kb);
+        }
+    }
+
+    /** Разблокировка клиента. */
+    private void handleUnblockClient(Long telegramId, Long clientId, String callbackId) {
+        try {
+            org.example.groombook.model.Client client = clientService.getById(clientId);
+            clientService.changeClientStatus(clientId, ClientStatus.ACTIVE, null);
+            notificationService.notifyClientUnblocked(client.getTelegramId());
+            answerCallback(callbackId, "Разблокирован");
+            send(telegramId, "✅ Клиент " + client.getName() + " разблокирован.");
+        } catch (GroomBookException e) {
+            answerCallback(callbackId, null);
+            send(telegramId, "Не удалось разблокировать: " + e.getMessage());
         }
     }
 

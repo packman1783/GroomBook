@@ -183,6 +183,12 @@ public class TelegramNotificationService implements NotificationService {
         sendToClient(telegramId, msg, null);
     }
 
+    @Override
+    public void notifyClientUnblocked(Long telegramId) {
+        String msg = "🔓 Ваш аккаунт разблокирован. Вы снова можете записываться на процедуры.";
+        sendToClient(telegramId, msg, null);
+    }
+
     // ── Вспомогательные методы ────────────────────────────────────────────────
 
     private void sendToMaster(String text, InlineKeyboardMarkup keyboard) {

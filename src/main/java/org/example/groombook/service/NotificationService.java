@@ -56,4 +56,9 @@ public interface NotificationService {
      * Уведомление клиента о блокировке.
      */
     void notifyClientBlocked(Long telegramId);
+
+    /**
+     * Уведомление клиента о разблокировке.
+     */
+    void notifyClientUnblocked(Long telegramId);
 }
