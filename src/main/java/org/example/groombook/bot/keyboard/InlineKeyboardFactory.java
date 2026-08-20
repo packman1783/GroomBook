@@ -174,6 +174,15 @@ public class InlineKeyboardFactory {
 
     // ── Вспомогательные методы ────────────────────────────────────────────────
 
+    /**
+     * Кнопка для добавления питомца в список
+     */
+    public InlineKeyboardMarkup addPetButton() {
+        return InlineKeyboardMarkup.builder()
+                .keyboardRow(new InlineKeyboardRow(button("➕ Добавить питомца", CallbackData.ADD_PET_START)))
+                .build();
+    }
+
     private InlineKeyboardButton button(String text, String callbackData) {
         return InlineKeyboardButton.builder()
                 .text(text)

@@ -77,7 +77,7 @@ public class ClientHandler {
         // Маппинг текстовых кнопок на команды
         switch (text) {
             case "📅 Записаться" -> command = "/book";
-            case "🐾 Мои питомцы" -> command = "/addpet";
+            case "🐾 Мои питомцы" -> command = "/mypets";
             case "📋 Мои записи" -> command = "/mybookings";
             case "❓ Помощь" -> command = "/help";
         }
@@ -87,9 +87,33 @@ public class ClientHandler {
             case "/book" -> handleBookStart(telegramId);
             case "/mybookings" -> handleMyBookings(telegramId);
             case "/addpet" -> handleAddPetStart(telegramId);
+            case "/mypets" -> handleMyPets(telegramId);
             case "/help" -> handleHelp(telegramId);
             default -> send(telegramId, "Не знаю такую команду. Используйте меню или /help для списка команд.");
         }
+    }
+
+    /**
+     * Просмотр списка питомцев клиента.
+     */
+    private void handleMyPets(Long telegramId) {
+        if (!clientService.isRegistered(telegramId)) {
+            send(telegramId, "Сначала нужно зарегистрироваться — отправьте /start");
+            return;
+        }
+
+        List<Pet> pets = clientService.getActivePets(telegramId);
+        if (pets.isEmpty()) {
+            send(telegramId, "У вас пока нет добавленных питомцев.", keyboards.addPetButton());
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder("🐾 *Ваши питомцы:*\n\n");
+        for (Pet pet : pets) {
+            sb.append(String.format("- %s (%s)\n", pet.getName(), pet.getType()));
+        }
+
+        send(telegramId, sb.toString(), keyboards.addPetButton());
     }
 
     /**
@@ -403,6 +427,10 @@ public class ClientHandler {
                 answerCallback(callbackId, "Запись отменена");
                 sessionManager.clear(telegramId);
                 send(telegramId, "Запись прервана. Если передумаете — используйте /book снова.");
+            }
+            case CallbackData.ADD_PET_START -> {
+                answerCallback(callbackId, null);
+                handleAddPetStart(telegramId);
             }
             default -> answerCallback(callbackId, null);
         }
