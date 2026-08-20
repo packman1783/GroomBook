@@ -16,6 +16,7 @@ public final class CallbackData {
     public static final String BOOK_DATE = "BOOK_DATE";
     public static final String BOOK_SLOT = "BOOK_SLOT";
     public static final String BOOK_PET = "BOOK_PET";
+    public static final String SKIP_COMMENT = "SKIP_COMMENT";
     public static final String PET_TYPE = "PET_TYPE";
     public static final String CANCEL_BOOKING = "CANCEL_BOOKING";
     public static final String CANCEL_CONFIRM = "CANCEL_CONFIRM";

@@ -220,7 +220,7 @@ public class ClientHandler {
         session.setState(SessionState.AWAITING_BOOKING_COMMENT);
 
         send(telegramId, "Оставьте комментарий к записи (например, особенности шерсти) " +
-                "или отправьте \"-\" чтобы пропустить.");
+                "или нажмите кнопку ниже, чтобы пропустить.", keyboards.skipCommentKeyboard());
     }
 
     /**
@@ -376,6 +376,10 @@ public class ClientHandler {
             case CallbackData.BOOK_DATE -> handleDateSelected(telegramId, LocalDate.parse(CallbackData.payload(data)), callbackId);
             case CallbackData.BOOK_SLOT -> handleSlotSelected(telegramId, CallbackData.payloadAsLong(data), callbackId);
             case CallbackData.BOOK_PET -> handlePetSelectedForBooking(telegramId, CallbackData.payloadAsLong(data), callbackId);
+            case CallbackData.SKIP_COMMENT -> {
+                answerCallback(callbackId, null);
+                finishBooking(telegramId, "-");
+            }
             case CallbackData.PET_TYPE -> handlePetTypeSelected(telegramId, CallbackData.payload(data), callbackId);
             case CallbackData.CANCEL_BOOKING -> handleCancelRequest(telegramId, CallbackData.payloadAsLong(data), callbackId);
             case CallbackData.CANCEL_CONFIRM -> handleCancelConfirmed(telegramId, CallbackData.payloadAsLong(data), callbackId);

@@ -96,6 +96,16 @@ public class InlineKeyboardFactory {
     }
 
     /**
+     * Кнопка для пропуска ввода комментария
+     */
+    public InlineKeyboardMarkup skipCommentKeyboard() {
+        return InlineKeyboardMarkup.builder()
+                .keyboardRow(new InlineKeyboardRow(button("➡️ Продолжить без комментария", CallbackData.SKIP_COMMENT)))
+                .keyboardRow(new InlineKeyboardRow(button("❌ Отмена", CallbackData.BOOK_CANCEL)))
+                .build();
+    }
+
+    /**
      * Кнопка "Отменить" для одной брони в списке /mybookings
      */
     public InlineKeyboardMarkup cancelBookingKeyboard(Long bookingId) {
