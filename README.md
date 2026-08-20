@@ -64,6 +64,10 @@ DB_PORT=5432
 DB_NAME=groombook
 DB_USER=postgres
 DB_PASSWORD=postgres
+
+# Необязательные настройки
+GOOGLE_CREDENTIALS_PATH=src/main/resources/credentials.json
+GOOGLE_CALENDAR_ID=primary
 ```
 
 ### Шаг 4 — Запустить базу данных
@@ -89,13 +93,16 @@ docker-compose up postgres -d
 
 ## Настройка
 
-В `application.yaml` можно изменить:
+В `src/main/resources/application.yaml` можно настроить параметры по умолчанию:
 
 ```yaml
 grooming:
   timezone: Europe/Moscow    # ваш часовой пояс
   master:
     address: ""              # адрес студии — показывается клиентам
+  google:
+    calendar-id: primary      # ID календаря
+    credentials-path: src/main/resources/credentials.json
 ```
 
 ---
@@ -107,18 +114,24 @@ grooming:
 Команда - Что делает
 `/start` - Регистрация или приветствие
 `/book` - Записаться на стрижку
-`/mybookings` - Посмотреть и отменить свои записи
-`/addpet` - Добавить питомца
+`/mybookings` - Посмотреть свои записи или отменить их
+`/addpet` - Добавить нового питомца
+`/help` - Справка по командам клиента
 
 ### Команды для мастера
 
 Команда - Что делает
+`/start` - Приветствие и главное меню
 `/today` - Все записи на сегодня
 `/tomorrow` - Все записи на завтра
+`/week` - Записи на ближайшую неделю
+`/fortnight` - Записи на ближайшие 2 недели
 `/newtemplate` - Создать новый шаблон расписания
-`/schedule` - Управление расписанием
+`/schedule` - Управление расписанием (активация шаблонов, блокировка слотов)
 `/vacation` - Заблокировать период (отпуск, болезнь)
-`/manual` - Создать договорную запись
+`/manual` - Создать договорную запись вручную
+`/blocked` - Список заблокированных клиентов
+`/help` - Справка по командам мастера
 
 ---
 
@@ -218,7 +231,11 @@ grooming:
 **3. Добавить в `.env`:**
 
 ```bash
-GOOGLE_CREDENTIALS_PATH=/путь/до/credentials.json
+# Путь к JSON-файлу (относительно корня или абсолютный)
+GOOGLE_CREDENTIALS_PATH=src/main/resources/credentials.json
+
+# ID календаря (по умолчанию 'primary')
+GOOGLE_CALENDAR_ID=your_email@gmail.com
 ```
 
 > Если Google Календарь не нужен — сервис работает и без него. При ошибке подключения бронь создаётся, просто без
@@ -228,17 +245,17 @@ GOOGLE_CREDENTIALS_PATH=/путь/до/credentials.json
 
 ## Структура проекта
 
-```
+```text
 src/main/java/org/example/groombook/
   ├── exception       — исключения  
   ├── model/          — сущности базы данных
   ├── repository/     — запросы к базе данных
   ├── service/        — бизнес-логика
-  ├── infrastructure/ — Telegram уведомления, Google Calendar, планировщик
+  ├── infrastructure/ — Telegram уведомления, Google Calendar
   └── bot/            — Telegram бот, обработчики команд
 src/main/resources/
-  ├── application.yaml
-  └── db/changelog/   — миграции Liquibase
+  ├── application.yaml — настройки приложения
+  └── db/changelog/    — миграции Liquibase
 ```
 
 ### Запуск тестов
