@@ -710,5 +710,19 @@ class BookingServiceTest {
             assertThat(result).hasSize(1);
             verify(bookingRepository).findByDate(today);
         }
+
+        @Test
+        @DisplayName("getActiveBookingsInRange — возвращает активные брони в диапазоне дат")
+        void getActiveBookingsInRange_returnsBookingsInRange() {
+            LocalDate from = LocalDate.now();
+            LocalDate to = LocalDate.now().plusDays(7);
+            when(bookingRepository.findActiveInDateRange(from, to))
+                    .thenReturn(List.of(pendingBooking, confirmedBooking));
+
+            List<Booking> result = bookingService.getActiveBookingsInRange(from, to);
+
+            assertThat(result).hasSize(2);
+            verify(bookingRepository).findActiveInDateRange(from, to);
+        }
     }
 }
