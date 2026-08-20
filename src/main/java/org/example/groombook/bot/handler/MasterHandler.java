@@ -30,7 +30,7 @@ import java.util.List;
  * <p>
  * Отвечает за:
  * <ul>
- *   <li>Просмотр записи на выбранные дни (/today, /tomorrow)</li>
+ *   <li>Просмотр записи на выбранные дни (/today, /tomorrow, /week, /fortnight)</li>
  *   <li>Управление жизненным циклом бронирования (подтверждение, отклонение, завершение, неявка)</li>
  *   <li>Делегирование задач управления расписанием и шаблонами подклассам {@link ScheduleHandler} и {@link TemplateWizardHandler}</li>
  * </ul>
@@ -58,30 +58,53 @@ public class MasterHandler {
         String command = text.split("\\s+")[0].toLowerCase();
 
         switch (command) {
+            case "/start" -> showWelcome(telegramId);
             case "/today" -> showBookingsForDate(telegramId, LocalDate.now());
             case "/tomorrow" -> showBookingsForDate(telegramId, LocalDate.now().plusDays(1));
+            case "/week" -> showBookingsForPeriod(telegramId, "неделю", LocalDate.now(), LocalDate.now().plusDays(6));
+            case "/fortnight" -> showBookingsForPeriod(telegramId, "2 недели", LocalDate.now(), LocalDate.now().plusDays(13));
             case "/schedule" -> scheduleHandler.handleScheduleCommand(telegramId);
             case "/vacation" -> scheduleHandler.handleVacationCommand(telegramId);
             case "/manual" -> scheduleHandler.handleManualCommand(telegramId);
             case "/newtemplate" -> templateWizardHandler.startWizard(telegramId);
-            default -> send(telegramId,
-                    """
-                    Доступные команды:
-                    /today — записи на сегодня
-                    /tomorrow — записи на завтра
-                    /schedule — управление расписанием
-                    /newtemplate — создать новый шаблон расписания
-                    /vacation — заблокировать период
-                    /manual — договорная запись""");
+            case "/help" -> handleHelp(telegramId);
+            default -> send(telegramId, "Неизвестная команда. Введите /help для просмотра списка команд.");
         }
+    }
+
+    private void showWelcome(Long telegramId) {
+        send(telegramId, "Здравствуйте, Мастер! 👋 Я ваш помощник по записи. Используйте /help для просмотра всех возможностей.");
+    }
+
+    /**
+     * Выводит справку по административным командам для мастера.
+     */
+    private void handleHelp(Long telegramId) {
+        String helpText = """
+                🛠 *Панель управления Мастера* 🛠
+                
+                *Просмотр записей:*
+                /today — Список всех записей на сегодня
+                /tomorrow — Список всех записей на завтра
+                /week — Список записей на ближайшие 7 дней
+                /fortnight — Список записей на ближайшие 14 дней
+
+                *Управление расписанием:*
+                /schedule — Общее управление слотами и шаблонами
+                /newtemplate — Создать новый недельный график работы
+                /vacation — Заблокировать диапазон дат (отпуск/выходные)
+                /manual — Записать клиента вручную (через выбор из базы)
+                
+                *Совет:* Для подтверждения или отмены записи используйте кнопки под сообщениями о новых заявках.
+                """;
+        send(telegramId, helpText);
     }
 
     /**
      * Обрабатывает нераспознанные текстовые команды для мастера.
      */
     public void handleUnrecognizedText(Long telegramId) {
-        send(telegramId, "Не понимаю это сообщение. Используйте /today, /tomorrow, " +
-                "/schedule или /newtemplate.");
+        send(telegramId, "Не понимаю это сообщение. Используйте /help для просмотра списка команд.");
     }
 
     // --- Просмотр записей ---
@@ -90,24 +113,32 @@ public class MasterHandler {
      * Отображает список визитов на конкретную дату с кнопками быстрого управления каждой бронью.
      */
     private void showBookingsForDate(Long telegramId, LocalDate date) {
-        List<Booking> bookings = bookingService.getBookingsForDate(date);
+        showBookingsForPeriod(telegramId, date.format(DATE_FMT), date, date);
+    }
+
+    /**
+     * Отображает список активных визитов за указанный период.
+     */
+    private void showBookingsForPeriod(Long telegramId, String periodTitle, LocalDate from, LocalDate to) {
+        List<Booking> bookings = bookingService.getActiveBookingsInRange(from, to);
 
         if (bookings.isEmpty()) {
-            send(telegramId, "На " + date.format(DATE_FMT) + " записей нет.");
+            send(telegramId, "За период (" + periodTitle + ") записей нет.");
             return;
         }
 
-        send(telegramId, "📅 Записи на " + date.format(DATE_FMT) + ":");
+        send(telegramId, "📅 Записи на " + periodTitle + ":");
 
         for (Booking booking : bookings) {
             String statusLabel = booking.isConfirmed() ? "✅ подтверждена" : "⏳ ожидает подтверждения";
 
             String msgText = String.format("""
-                            %s–%s
+                            [%s] %s–%s
                             👤 %s, %s
                             🐾 %s
                             Статус: %s
                             %s""",
+                    booking.getSlot().getDate().format(DATE_FMT),
                     booking.getSlot().getStartTime().format(TIME_FMT),
                     booking.getSlot().getEndTime().format(TIME_FMT),
                     booking.getClient().getName(),
