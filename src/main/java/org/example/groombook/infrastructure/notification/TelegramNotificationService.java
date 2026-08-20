@@ -177,6 +177,12 @@ public class TelegramNotificationService implements NotificationService {
         sendToClient(telegramId, escapeMarkdown(message), null);
     }
 
+    @Override
+    public void notifyClientBlocked(Long telegramId) {
+        String msg = "🚫 Ваш аккаунт был заблокирован мастером. Новые записи недоступны.";
+        sendToClient(telegramId, msg, null);
+    }
+
     // ── Вспомогательные методы ────────────────────────────────────────────────
 
     private void sendToMaster(String text, InlineKeyboardMarkup keyboard) {

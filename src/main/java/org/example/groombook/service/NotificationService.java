@@ -51,4 +51,9 @@ public interface NotificationService {
      * Используется для рассылки (например, "давно не заходили").
      */
     void sendMessageToClient(Long telegramId, String message);
+
+    /**
+     * Уведомление клиента о блокировке.
+     */
+    void notifyClientBlocked(Long telegramId);
 }

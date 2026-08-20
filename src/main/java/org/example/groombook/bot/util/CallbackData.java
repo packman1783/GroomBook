@@ -28,7 +28,8 @@ public final class CallbackData {
     public static final String REJECT_BOOKING = "REJECT_BOOKING";
     public static final String COMPLETE_BOOKING = "COMPLETE_BOOKING";
     public static final String NO_SHOW_BOOKING = "NO_SHOW_BOOKING";
-    public static final String BLOCK_SLOT = "BLOCK_SLOT";
+    public static final String BLOCK_CLIENT    = "BLOCK_CLIENT";
+    public static final String BLOCK_SLOT      = "BLOCK_SLOT";
     public static final String UNBLOCK_SLOT = "UNBLOCK_SLOT";
 
     // ── Меню /schedule ──────────────────────────────────────────────────────────

@@ -505,7 +505,7 @@ public class BookingService {
                 .orElseThrow(() -> new SlotNotFoundException(slotId));
     }
 
-    private Booking findBookingById(Long bookingId) {
+    public Booking findBookingById(Long bookingId) {
         return bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new BookingNotFoundException(bookingId));
     }

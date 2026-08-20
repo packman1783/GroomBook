@@ -9,7 +9,10 @@ import org.example.groombook.bot.session.UserSession;
 import org.example.groombook.bot.util.CallbackData;
 import org.example.groombook.exception.GroomBookException;
 import org.example.groombook.model.Booking;
+import org.example.groombook.model.enums.ClientStatus;
 import org.example.groombook.service.BookingService;
+import org.example.groombook.service.ClientService;
+import org.example.groombook.service.NotificationService;
 
 import org.springframework.stereotype.Component;
 
@@ -39,8 +42,9 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class MasterHandler {
-
+    private final ClientService clientService;
     private final BookingService bookingService;
+    private final NotificationService notificationService;
     private final ScheduleHandler scheduleHandler;
     private final TemplateWizardHandler templateWizardHandler;
     private final SessionManager sessionManager;
@@ -172,6 +176,7 @@ public class MasterHandler {
             case CallbackData.REJECT_BOOKING -> handleRejectRequest(telegramId, CallbackData.payloadAsLong(data), callbackId);
             case CallbackData.COMPLETE_BOOKING -> handleCompleteRequest(telegramId, CallbackData.payloadAsLong(data), callbackId);
             case CallbackData.NO_SHOW_BOOKING -> handleNoShow(telegramId, CallbackData.payloadAsLong(data), callbackId);
+            case CallbackData.BLOCK_CLIENT -> handleBlockClientRequest(telegramId, CallbackData.payloadAsLong(data), callbackId);
 
             // Перенаправление события в хэндлер расписания
             case CallbackData.SCHEDULE_TEMPLATES,
@@ -227,6 +232,18 @@ public class MasterHandler {
                     session.reset();
                 }
             }
+            case AWAITING_BLOCK_REASON -> {
+                Long clientId = session.getPendingClientId();
+                try {
+                    clientService.changeClientStatus(clientId, ClientStatus.BLOCKED, text);
+                    notificationService.notifyClientBlocked(clientService.getById(clientId).getTelegramId());
+                    send(telegramId, "Клиент заблокирован. Он больше не сможет записываться.");
+                } catch (GroomBookException e) {
+                    send(telegramId, "Не удалось заблокировать: " + e.getMessage());
+                } finally {
+                    session.reset();
+                }
+            }
             default -> handleUnrecognizedText(telegramId);
         }
     }
@@ -275,6 +292,20 @@ public class MasterHandler {
         }
     }
 
+    /** Запрос причины блокировки клиента. */
+    private void handleBlockClientRequest(Long telegramId, Long bookingId, String callbackId) {
+        answerCallback(callbackId, null);
+        try {
+            Booking booking = bookingService.findBookingById(bookingId);
+            UserSession session = sessionManager.get(telegramId);
+            session.setPendingClientId(booking.getClient().getId());
+            session.setState(SessionState.AWAITING_BLOCK_REASON);
+            send(telegramId, "Укажите причину блокировки клиента (клиент её не увидит):");
+        } catch (GroomBookException e) {
+            send(telegramId, "Ошибка: " + e.getMessage());
+        }
+    }
+
     // --- Вспомогательные методы ---
 
     /**
@@ -288,12 +319,18 @@ public class MasterHandler {
                             btn("✅ Подтвердить", CallbackData.build(CallbackData.CONFIRM_BOOKING, bookingId)),
                             btn("❌ Отклонить", CallbackData.build(CallbackData.REJECT_BOOKING, bookingId))
                     ))
+                    .keyboardRow(new InlineKeyboardRow(
+                            btn("🚫 Блокировать клиента", CallbackData.build(CallbackData.BLOCK_CLIENT, bookingId))
+                    ))
                     .build();
         }
         return InlineKeyboardMarkup.builder()
                 .keyboardRow(new InlineKeyboardRow(
                         btn("☑️ Завершить", CallbackData.build(CallbackData.COMPLETE_BOOKING, bookingId)),
                         btn("🚫 No-show", CallbackData.build(CallbackData.NO_SHOW_BOOKING, bookingId))
+                ))
+                .keyboardRow(new InlineKeyboardRow(
+                        btn("🚫 Блокировать клиента", CallbackData.build(CallbackData.BLOCK_CLIENT, bookingId))
                 ))
                 .build();
     }
