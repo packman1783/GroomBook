@@ -181,8 +181,8 @@ public class BookingService {
             bookingRepository.save(booking);
         } catch (Exception e) {
             // Ошибка Calendar не должна откатывать бронь — логируем и продолжаем
-            log.warn("Не удалось создать событие в Google Calendar для брони #{}: {}",
-                    booking.getId(), e.getMessage());
+            log.error("КРИТИЧЕСКАЯ ОШИБКА Google Calendar при создании договорной записи #{}: {}",
+                    booking.getId(), e.getMessage(), e);
         }
 
         log.info("Создана договорная запись #{} клиент={} дата={} время={}",
@@ -213,8 +213,8 @@ public class BookingService {
             String eventId = googleCalendarService.createEvent(booking);
             booking.confirm(eventId);
         } catch (Exception e) {
-            log.warn("Ошибка Google Calendar при подтверждении брони #{}: {}",
-                    bookingId, e.getMessage());
+            log.error("КРИТИЧЕСКАЯ ОШИБКА Google Calendar при подтверждении брони #{}: {}",
+                    bookingId, e.getMessage(), e);
             // Подтверждаем без Calendar — мастер может добавить вручную
             booking.confirm(null);
         }

@@ -46,6 +46,8 @@ public class GoogleCalendarServiceImpl implements GoogleCalendarService {
                     created.getId(), booking.getId());
             return created.getId();
         } catch (IOException e) {
+            log.error("Ошибка создания события в Google Calendar для брони #{}: {}", 
+                    booking.getId(), e.getMessage(), e);
             throw new RuntimeException(
                     "Ошибка создания события в Google Calendar: " + e.getMessage(), e);
         }
@@ -70,6 +72,8 @@ public class GoogleCalendarServiceImpl implements GoogleCalendarService {
             log.info("Обновлено событие Calendar id={} для брони #{}",
                     eventId, booking.getId());
         } catch (IOException e) {
+            log.error("Ошибка обновления события в Google Calendar id={} для брони #{}: {}", 
+                    eventId, booking.getId(), e.getMessage(), e);
             throw new RuntimeException(
                     "Ошибка обновления события в Google Calendar: " + e.getMessage(), e);
         }
