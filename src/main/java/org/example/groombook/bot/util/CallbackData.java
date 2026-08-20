@@ -23,6 +23,8 @@ public final class CallbackData {
     public static final String CANCEL_ABORT = "CANCEL_ABORT";
     public static final String BOOK_CANCEL = "BOOK_CANCEL";
     public static final String ADD_PET_START = "ADD_PET_START";
+    public static final String ADD_PET_CONFIRM = "ADD_PET_CONFIRM";
+    public static final String ADD_PET_DUPLICATE = "ADD_PET_DUPLICATE";
 
     // ── Сценарии мастера ───────────────────────────────────────────────────────
     public static final String CONFIRM_BOOKING = "CONFIRM_BOOKING";

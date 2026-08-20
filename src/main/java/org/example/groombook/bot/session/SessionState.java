@@ -20,6 +20,7 @@ public enum SessionState {
      * Добавление питомца
      */
     AWAITING_PET_NAME,
+    AWAITING_PET_NAME_CONFIRMATION,
 
     /**
      * Бронирование

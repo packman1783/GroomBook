@@ -365,10 +365,7 @@ public class ClientHandler {
                         "(в формате +79991234567) или нажмите кнопку ниже, чтобы отправить свой текущий номер.", keyboards.contactKeyboard());
             }
             case AWAITING_PHONE -> handlePhoneEntered(telegramId, text, session);
-            case AWAITING_PET_NAME -> {
-                session.setPendingPetName(text);
-                send(telegramId, "Кто это?", keyboards.petTypeKeyboard());
-            }
+            case AWAITING_PET_NAME -> handlePetNameEntered(telegramId, text, session);
             case AWAITING_BOOKING_COMMENT -> finishBooking(telegramId, text);
             default -> handleUnrecognizedText(telegramId);
         }
@@ -397,6 +394,23 @@ public class ClientHandler {
             send(telegramId, "Этот номер телефона уже зарегистрирован. " +
                     "Если это ваш номер — свяжитесь с мастером напрямую.", new ReplyKeyboardRemove(true));
             session.reset();
+        }
+    }
+
+    private void handlePetNameEntered(Long telegramId, String name, UserSession session) {
+        session.setPendingPetName(name);
+
+        List<Pet> activePets = clientService.getActivePets(telegramId);
+        boolean exists = activePets.stream()
+                .anyMatch(p -> p.getName().equalsIgnoreCase(name.trim()));
+
+        if (exists) {
+            session.setState(SessionState.AWAITING_PET_NAME_CONFIRMATION);
+            send(telegramId, "Питомец с именем \"" + name + "\" уже есть в вашем списке. " +
+                    "Вы хотите добавить ещё одного питомца с таким же именем?", keyboards.confirmPetNameKeyboard());
+        } else {
+            session.setState(SessionState.AWAITING_PET_NAME); // Остаемся или просто переходим к выбору типа
+            send(telegramId, "Кто это?", keyboards.petTypeKeyboard());
         }
     }
 
@@ -431,6 +445,15 @@ public class ClientHandler {
             case CallbackData.ADD_PET_START -> {
                 answerCallback(callbackId, null);
                 handleAddPetStart(telegramId);
+            }
+            case CallbackData.ADD_PET_CONFIRM -> {
+                answerCallback(callbackId, null);
+                send(telegramId, "Хорошо, кто это?", keyboards.petTypeKeyboard());
+            }
+            case CallbackData.ADD_PET_DUPLICATE -> {
+                answerCallback(callbackId, "Отменено");
+                sessionManager.clear(telegramId);
+                send(telegramId, "Добавление питомца отменено.", keyboards.clientMainMenu());
             }
             default -> answerCallback(callbackId, null);
         }

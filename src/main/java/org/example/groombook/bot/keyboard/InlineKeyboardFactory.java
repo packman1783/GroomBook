@@ -183,6 +183,18 @@ public class InlineKeyboardFactory {
                 .build();
     }
 
+    /**
+     * Клавиатура для подтверждения добавления питомца с дублирующимся именем
+     */
+    public InlineKeyboardMarkup confirmPetNameKeyboard() {
+        return InlineKeyboardMarkup.builder()
+                .keyboardRow(new InlineKeyboardRow(
+                        button("✅ Это новый питомец", CallbackData.ADD_PET_CONFIRM),
+                        button("❌ Отмена", CallbackData.ADD_PET_DUPLICATE)
+                ))
+                .build();
+    }
+
     private InlineKeyboardButton button(String text, String callbackData) {
         return InlineKeyboardButton.builder()
                 .text(text)
