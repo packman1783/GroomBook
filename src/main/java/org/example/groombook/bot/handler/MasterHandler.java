@@ -3,6 +3,7 @@ package org.example.groombook.bot.handler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.example.groombook.bot.keyboard.InlineKeyboardFactory;
 import org.example.groombook.bot.session.SessionManager;
 import org.example.groombook.bot.session.SessionState;
 import org.example.groombook.bot.session.UserSession;
@@ -21,6 +22,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
@@ -48,6 +50,7 @@ public class MasterHandler {
     private final ScheduleHandler scheduleHandler;
     private final TemplateWizardHandler templateWizardHandler;
     private final SessionManager sessionManager;
+    private final InlineKeyboardFactory keyboards;
     private final TelegramClient telegramClient;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("d MMMM");
@@ -61,6 +64,19 @@ public class MasterHandler {
     public void handleCommand(Long telegramId, String text) {
         String command = text.split("\\s+")[0].toLowerCase();
 
+        // Маппинг текстовых кнопок на команды
+        switch (text) {
+            case "📅 Сегодня" -> command = "/today";
+            case "📅 Завтра" -> command = "/tomorrow";
+            case "🗓 Неделя" -> command = "/week";
+            case "🗓 2 недели" -> command = "/fortnight";
+            case "⚙️ Расписание" -> command = "/schedule";
+            case "🆕 Шаблон" -> command = "/newtemplate";
+            case "📝 Записать вручную" -> command = "/manual";
+            case "🚫 Блок-лист" -> command = "/blocked";
+            case "❓ Помощь" -> command = "/help";
+        }
+
         switch (command) {
             case "/start" -> showWelcome(telegramId);
             case "/today" -> showBookingsForDate(telegramId, LocalDate.now());
@@ -73,12 +89,12 @@ public class MasterHandler {
             case "/newtemplate" -> templateWizardHandler.startWizard(telegramId);
             case "/blocked" -> showBlockedClients(telegramId);
             case "/help" -> handleHelp(telegramId);
-            default -> send(telegramId, "Неизвестная команда. Введите /help для просмотра списка команд.");
+            default -> send(telegramId, "Неизвестная команда. Введите /help для просмотра списка кнопок.");
         }
     }
 
     private void showWelcome(Long telegramId) {
-        send(telegramId, "Здравствуйте, Мастер! 👋 Я ваш помощник по записи. Используйте /help для просмотра всех возможностей.");
+        send(telegramId, "Здравствуйте, Мастер! 👋 Я ваш помощник по записи. Используйте меню снизу для управления.", keyboards.masterMainMenu());
     }
 
     /**
@@ -88,22 +104,15 @@ public class MasterHandler {
         String helpText = """
                 🛠 *Панель управления Мастера* 🛠
                 
-                *Просмотр записей:*
-                /today — Список всех записей на сегодня
-                /tomorrow — Список всех записей на завтра
-                /week — Список записей на ближайшие 7 дней
-                /fortnight — Список записей на ближайшие 14 дней
-
-                *Управление расписанием:*
-                /schedule — Общее управление слотами и шаблонами
-                /newtemplate — Создать новый недельный график работы
-                /vacation — Заблокировать диапазон дат (отпуск/выходные)
-                /manual — Записать клиента вручную (через выбор из базы)
-                /blocked — Список заблокированных клиентов
+                Используйте кнопки меню для быстрого доступа к функциям:
+                
+                📅 *Просмотр записей:* Сегодня, Завтра, Неделя, 2 недели
+                ⚙️ *Управление:* Расписание, Создать шаблон, Заблокированные
+                📝 *Ручной ввод:* Записать клиента в базу вручную
                 
                 *Совет:* Для подтверждения или отмены записи используйте кнопки под сообщениями о новых заявках.
                 """;
-        send(telegramId, helpText);
+        send(telegramId, helpText, keyboards.masterMainMenu());
     }
 
     /**
@@ -394,14 +403,15 @@ public class MasterHandler {
     }
 
     private void send(Long chatId, String text) {
-        send(chatId, text, null);
+        send(chatId, text, (ReplyKeyboard) null);
     }
 
-    private void send(Long chatId, String text, InlineKeyboardMarkup keyboard) {
+    private void send(Long chatId, String text, ReplyKeyboard keyboard) {
         SendMessage message = SendMessage.builder()
                 .chatId(chatId.toString())
                 .text(text)
                 .replyMarkup(keyboard)
+                .parseMode("Markdown")
                 .build();
         try {
             telegramClient.execute(message);

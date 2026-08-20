@@ -131,6 +131,32 @@ public class InlineKeyboardFactory {
     }
 
     /**
+     * Главное меню Мастера (ReplyKeyboard)
+     */
+    public ReplyKeyboardMarkup masterMainMenu() {
+        return ReplyKeyboardMarkup.builder()
+                .keyboardRow(new KeyboardRow("📅 Сегодня", "📅 Завтра"))
+                .keyboardRow(new KeyboardRow("🗓 Неделя", "🗓 2 недели"))
+                .keyboardRow(new KeyboardRow("⚙️ Расписание", "🆕 Шаблон"))
+                .keyboardRow(new KeyboardRow("📝 Записать вручную", "🚫 Блок-лист"))
+                .keyboardRow(new KeyboardRow("❓ Помощь"))
+                .resizeKeyboard(true)
+                .build();
+    }
+
+    /**
+     * Главное меню Клиента (ReplyKeyboard)
+     */
+    public ReplyKeyboardMarkup clientMainMenu() {
+        return ReplyKeyboardMarkup.builder()
+                .keyboardRow(new KeyboardRow("📅 Записаться"))
+                .keyboardRow(new KeyboardRow("🐾 Мои питомцы", "📋 Мои записи"))
+                .keyboardRow(new KeyboardRow("❓ Помощь"))
+                .resizeKeyboard(true)
+                .build();
+    }
+
+    /**
      * Клавиатура для запроса номера телефона (ReplyKeyboard)
      */
     public ReplyKeyboardMarkup contactKeyboard() {

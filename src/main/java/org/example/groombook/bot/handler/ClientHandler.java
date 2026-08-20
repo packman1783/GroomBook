@@ -74,13 +74,21 @@ public class ClientHandler {
     public void handleCommand(Long telegramId, String text) {
         String command = text.split("\\s+")[0].toLowerCase();
 
+        // Маппинг текстовых кнопок на команды
+        switch (text) {
+            case "📅 Записаться" -> command = "/book";
+            case "🐾 Мои питомцы" -> command = "/addpet";
+            case "📋 Мои записи" -> command = "/mybookings";
+            case "❓ Помощь" -> command = "/help";
+        }
+
         switch (command) {
             case "/start" -> handleStart(telegramId);
             case "/book" -> handleBookStart(telegramId);
             case "/mybookings" -> handleMyBookings(telegramId);
             case "/addpet" -> handleAddPetStart(telegramId);
             case "/help" -> handleHelp(telegramId);
-            default -> send(telegramId, "Не знаю такую команду. Попробуйте /help для списка команд.");
+            default -> send(telegramId, "Не знаю такую команду. Используйте меню или /help для списка команд.");
         }
     }
 
@@ -93,22 +101,20 @@ public class ClientHandler {
                 
                 Я помогу вам записаться к грумеру быстро и удобно!
                 
-                *Доступные команды:*
-                /book — Выбрать дату и время для записи
-                /mybookings — Посмотреть ваши активные записи или отменить их
-                /addpet — Добавить нового питомца в профиль
-                /help — Показать это сообщение
-                /start — Начало работы / Регистрация
+                Используйте кнопки меню:
+                📅 *Записаться* — Выбрать дату и время
+                📋 *Мои записи* — Посмотреть ваши активные записи или отменить их
+                🐾 *Мои питомцы* — Добавить нового питомца
                 
                 *Как это работает:*
                 1. Зарегистрируйтесь при первом входе.
-                2. Добавьте одного или нескольких питомцев через /addpet.
-                3. Выберите удобное время через /book.
-                4. Дождитесь подтверждения от мастера (вам придёт уведомление).
+                2. Добавьте питомца (если еще не добавили).
+                3. Выберите удобное время.
+                4. Дождитесь подтверждения от мастера.
                 
-                Если у вас возникли вопросы или нужно перенести запись менее чем за 24 часа, пожалуйста, свяжитесь с мастером напрямую.
+                Если у вас возникли вопросы, пожалуйста, свяжитесь с мастером напрямую.
                 """;
-        send(telegramId, helpText);
+        send(telegramId, helpText, keyboards.clientMainMenu());
     }
 
     /**
@@ -129,10 +135,8 @@ public class ClientHandler {
             send(telegramId, """
                     Привет! 👋 Рады видеть вас снова.
                     
-                    Чтобы записаться на груминг, используйте команду /book.
-                    Посмотреть свои записи — /mybookings.
-                    Если нужна помощь — /help.
-                    """);
+                    Используйте меню снизу, чтобы записаться или посмотреть свои записи.
+                    """, keyboards.clientMainMenu());
             return;
         }
 
@@ -364,8 +368,7 @@ public class ClientHandler {
             send(telegramId, """
                     ✅ Регистрация завершена!
                     
-                    Теперь добавьте питомца командой /addpet, \
-                    а затем записывайтесь на стрижку через /book.""", new ReplyKeyboardRemove(true));
+                    Используйте меню снизу, чтобы записаться или добавить питомцев.""", keyboards.clientMainMenu());
         } catch (PhoneAlreadyRegisteredException e) {
             send(telegramId, "Этот номер телефона уже зарегистрирован. " +
                     "Если это ваш номер — свяжитесь с мастером напрямую.", new ReplyKeyboardRemove(true));
@@ -417,7 +420,7 @@ public class ClientHandler {
         Pet pet = clientService.addPet(telegramId, session.getPendingPetName(), type, null);
         session.reset();
 
-        send(telegramId, "🎉 Питомец \"" + pet.getName() + "\" добавлен!Теперь можно записаться через /book.");
+        send(telegramId, "🎉 Питомец \"" + pet.getName() + "\" добавлен! Теперь можно записаться.", keyboards.clientMainMenu());
     }
 
     // --- Вспомогательные методы отправки ---

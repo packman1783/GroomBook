@@ -51,9 +51,9 @@ public class UpdateDispatcher {
         if (message.hasText()) {
             String text = message.getText().trim();
 
-            // Команды (начинаются с "/") всегда сбрасывают текущий многошаговый сценарий —
-            // пользователь явно переключился на другое действие
-            if (text.startsWith("/")) {
+            // Команды (начинаются с "/") или текст с кнопок главного меню всегда сбрасывают текущий 
+            // многошаговый сценарий — пользователь явно переключился на другое действие
+            if (text.startsWith("/") || isMainMenuButton(text)) {
                 sessionManager.clear(telegramId);
                 if (isMaster) {
                     masterHandler.handleCommand(telegramId, text);
@@ -98,5 +98,14 @@ public class UpdateDispatcher {
         } else {
             clientHandler.handleCallback(telegramId, data, callbackId);
         }
+    }
+
+    private boolean isMainMenuButton(String text) {
+        return switch (text) {
+            case "📅 Сегодня", "📅 Завтра", "🗓 Неделя", "🗓 2 недели", "⚙️ Расписание",
+                 "🆕 Шаблон", "📝 Записать вручную", "🚫 Блок-лист", "❓ Помощь",
+                 "📅 Записаться", "🐾 Мои питомцы", "📋 Мои записи" -> true;
+            default -> false;
+        };
     }
 }
