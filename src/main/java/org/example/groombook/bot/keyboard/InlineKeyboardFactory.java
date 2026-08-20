@@ -7,8 +7,11 @@ import org.example.groombook.model.TimeSlot;
 import org.springframework.stereotype.Component;
 
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardButton;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -124,6 +127,22 @@ public class InlineKeyboardFactory {
                         button("✅ Да, отменить", CallbackData.build(CallbackData.CANCEL_CONFIRM, bookingId)),
                         button("↩️ Нет", CallbackData.CANCEL_ABORT)
                 ))
+                .build();
+    }
+
+    /**
+     * Клавиатура для запроса номера телефона (ReplyKeyboard)
+     */
+    public ReplyKeyboardMarkup contactKeyboard() {
+        return ReplyKeyboardMarkup.builder()
+                .keyboardRow(new KeyboardRow(
+                        KeyboardButton.builder()
+                                .text("📱 Отправить мой номер телефона")
+                                .requestContact(true)
+                                .build()
+                ))
+                .resizeKeyboard(true)
+                .oneTimeKeyboard(true)
                 .build();
     }
 

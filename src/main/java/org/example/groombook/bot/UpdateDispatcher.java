@@ -37,7 +37,7 @@ public class UpdateDispatcher {
     public void dispatch(Update update) {
         if (update.hasCallbackQuery()) {
             dispatchCallback(update.getCallbackQuery());
-        } else if (update.hasMessage() && update.getMessage().hasText()) {
+        } else if (update.hasMessage()) {
             dispatchMessage(update.getMessage());
         }
         // Прочие типы апдейтов (фото, стикеры и т.д.) сейчас не обрабатываются
@@ -45,38 +45,44 @@ public class UpdateDispatcher {
 
     private void dispatchMessage(Message message) {
         Long telegramId = message.getChatId();
-        String text = message.getText().trim();
-
         boolean isMaster = telegramId.equals(masterTelegramId);
-
-        // Команды (начинаются с "/") всегда сбрасывают текущий многошаговый сценарий —
-        // пользователь явно переключился на другое действие
-        if (text.startsWith("/")) {
-            sessionManager.clear(telegramId);
-            if (isMaster) {
-                masterHandler.handleCommand(telegramId, text);
-            } else {
-                clientHandler.handleCommand(telegramId, text);
-            }
-            return;
-        }
-
-        // Не команда — значит это ответ в рамках текущего многошагового сценария
         SessionState state = sessionManager.get(telegramId).getState();
-        if (state == SessionState.NONE) {
-            // Пользователь написал текст без активного сценария — подсказываем команды
-            if (isMaster) {
-                masterHandler.handleUnrecognizedText(telegramId);
-            } else {
-                clientHandler.handleUnrecognizedText(telegramId);
-            }
-            return;
-        }
 
-        if (isMaster) {
-            masterHandler.handleTextInput(telegramId, text, state);
-        } else {
-            clientHandler.handleTextInput(telegramId, text, state);
+        if (message.hasText()) {
+            String text = message.getText().trim();
+
+            // Команды (начинаются с "/") всегда сбрасывают текущий многошаговый сценарий —
+            // пользователь явно переключился на другое действие
+            if (text.startsWith("/")) {
+                sessionManager.clear(telegramId);
+                if (isMaster) {
+                    masterHandler.handleCommand(telegramId, text);
+                } else {
+                    clientHandler.handleCommand(telegramId, text);
+                }
+                return;
+            }
+
+            // Не команда — значит это ответ в рамках текущего многошагового сценария
+            if (state == SessionState.NONE) {
+                // Пользователь написал текст без активного сценария — подсказываем команды
+                if (isMaster) {
+                    masterHandler.handleUnrecognizedText(telegramId);
+                } else {
+                    clientHandler.handleUnrecognizedText(telegramId);
+                }
+                return;
+            }
+
+            if (isMaster) {
+                masterHandler.handleTextInput(telegramId, text, state);
+            } else {
+                clientHandler.handleTextInput(telegramId, text, state);
+            }
+        } else if (message.hasContact()) {
+            if (!isMaster) {
+                clientHandler.handleContact(telegramId, message.getContact().getPhoneNumber(), state);
+            }
         }
     }
 

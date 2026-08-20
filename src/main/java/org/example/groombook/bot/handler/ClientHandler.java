@@ -29,6 +29,9 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboard;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardRemove;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
 
@@ -333,7 +336,7 @@ public class ClientHandler {
                 session.setPendingName(text);
                 session.setState(SessionState.AWAITING_PHONE);
                 send(telegramId, "Отлично, " + text + "! Теперь укажите номер телефона " +
-                        "(в формате +79991234567):");
+                        "(в формате +79991234567) или нажмите кнопку ниже, чтобы отправить свой текущий номер.", keyboards.contactKeyboard());
             }
             case AWAITING_PHONE -> handlePhoneEntered(telegramId, text, session);
             case AWAITING_PET_NAME -> {
@@ -346,8 +349,16 @@ public class ClientHandler {
     }
 
     /**
-     * Финализация ввода номера телефона и попытка создания нового клиента в БД.
+     * Обработка полученного контакта.
      */
+    public void handleContact(Long telegramId, String phone, SessionState state) {
+        UserSession session = sessionManager.get(telegramId);
+        if (state == SessionState.AWAITING_PHONE) {
+            handlePhoneEntered(telegramId, phone, session);
+        } else {
+            handleUnrecognizedText(telegramId);
+        }
+    }
     private void handlePhoneEntered(Long telegramId, String phone, UserSession session) {
         try {
             clientService.getOrCreateClient(telegramId, session.getPendingName(), phone);
@@ -356,10 +367,10 @@ public class ClientHandler {
                     ✅ Регистрация завершена!
                     
                     Теперь добавьте питомца командой /addpet, \
-                    а затем записывайтесь на стрижку через /book.""");
+                    а затем записывайтесь на стрижку через /book.""", new ReplyKeyboardRemove(true));
         } catch (PhoneAlreadyRegisteredException e) {
             send(telegramId, "Этот номер телефона уже зарегистрирован. " +
-                    "Если это ваш номер — свяжитесь с мастером напрямую.");
+                    "Если это ваш номер — свяжитесь с мастером напрямую.", new ReplyKeyboardRemove(true));
             session.reset();
         }
     }
@@ -421,9 +432,9 @@ public class ClientHandler {
     }
 
     /**
-     * Отправляет текстовое сообщение пользователю с прикрепленной инлайн-клавиатурой.
+     * Отправляет текстовое сообщение пользователю с прикрепленной клавиатурой.
      */
-    private void send(Long chatId, String text, InlineKeyboardMarkup keyboard) {
+    private void send(Long chatId, String text, ReplyKeyboard keyboard) {
         SendMessage message = SendMessage.builder()
                 .chatId(chatId.toString())
                 .text(text)
