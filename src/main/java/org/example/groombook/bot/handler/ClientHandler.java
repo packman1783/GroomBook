@@ -17,6 +17,7 @@ import org.example.groombook.exception.PhoneAlreadyRegisteredException;
 import org.example.groombook.exception.SlotAlreadyBookedException;
 import org.example.groombook.exception.SlotTooSoonException;
 import org.example.groombook.model.Booking;
+import org.example.groombook.model.Client;
 import org.example.groombook.model.Pet;
 import org.example.groombook.model.TimeSlot;
 import org.example.groombook.model.enums.PetType;
@@ -384,12 +385,12 @@ public class ClientHandler {
     }
     private void handlePhoneEntered(Long telegramId, String phone, UserSession session) {
         try {
-            clientService.getOrCreateClient(telegramId, session.getPendingName(), phone);
+            Client client = clientService.getOrCreateClient(telegramId, session.getPendingName(), phone);
             session.reset();
-            send(telegramId, """
-                    ✅ Регистрация завершена!
+            send(telegramId, String.format("""
+                    ✅ %s, регистрация завершена!
                     
-                    Используйте меню снизу, чтобы записаться или добавить питомцев.""", keyboards.clientMainMenu());
+                    Используйте меню снизу, чтобы записаться или добавить питомцев.""", client.getName()), keyboards.clientMainMenu());
         } catch (PhoneAlreadyRegisteredException e) {
             send(telegramId, "Этот номер телефона уже зарегистрирован. " +
                     "Если это ваш номер — свяжитесь с мастером напрямую.", new ReplyKeyboardRemove(true));
