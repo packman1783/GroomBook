@@ -7,9 +7,12 @@ import org.example.groombook.model.enums.BookingStatus;
 import org.example.groombook.model.enums.BookingType;
 import org.example.groombook.repository.BookingRepository;
 import org.example.groombook.repository.ClientRepository;
+import org.example.groombook.repository.DayOverrideRepository;
 import org.example.groombook.repository.PetRepository;
+import org.example.groombook.repository.ScheduleTemplateRepository;
 import org.example.groombook.repository.TimeSlotRepository;
 import org.example.groombook.service.dto.MonthlyReport;
+import org.example.groombook.service.dto.WeeklyReport;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,7 +27,8 @@ import java.time.YearMonth;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +42,10 @@ class StatisticsServiceTest {
     private PetRepository petRepository;
     @Mock
     private TimeSlotRepository timeSlotRepository;
+    @Mock
+    private ScheduleTemplateRepository templateRepository;
+    @Mock
+    private DayOverrideRepository overrideRepository;
 
     @InjectMocks
     private StatisticsService statisticsService;
@@ -82,31 +90,20 @@ class StatisticsServiceTest {
     }
 
     @Test
-    void getMonthlyReport_manualHoursCalculation() {
-        YearMonth month = YearMonth.of(2023, 10);
-        LocalDate from = month.atDay(1);
-        LocalDate to = month.atEndOfMonth();
+    void getWeeklyReport_shouldCalculateCorrectly() {
+        LocalDate from = LocalDate.of(2023, 10, 2); // Monday
+        LocalDate to = from.plusDays(6);
 
-        TimeSlot manualSlot = TimeSlot.builder()
-                .date(from)
-                .startTime(LocalTime.of(10, 0))
-                .endTime(LocalTime.of(13, 0))
-                .build();
-        
-        Client client = Client.builder().id(1L).build();
-        Booking manualBooking = Booking.builder()
-                .client(client)
-                .slot(manualSlot)
-                .status(BookingStatus.COMPLETED)
-                .bookingType(BookingType.MANUAL)
-                .build();
+        when(templateRepository.findActive()).thenReturn(java.util.Optional.empty());
+        when(bookingRepository.findActiveInDateRange(from, to)).thenReturn(Collections.emptyList());
+        when(timeSlotRepository.findByDateBetween(from, to)).thenReturn(Collections.emptyList());
+        when(overrideRepository.findByDateBetweenOrderByDateAsc(from, to)).thenReturn(Collections.emptyList());
 
-        when(bookingRepository.findActiveInDateRange(from, to)).thenReturn(List.of(manualBooking));
-        when(timeSlotRepository.findFreeSlotsBetween(from, to)).thenReturn(Collections.emptyList());
-        when(bookingRepository.findAllByClientId(1L)).thenReturn(List.of(manualBooking));
+        WeeklyReport report = statisticsService.getWeeklyReport(from, to);
 
-        MonthlyReport report = statisticsService.getMonthlyReport(month);
-        
-        assertEquals(3, report.getManualBookingHours());
+        assertNotNull(report);
+        assertEquals(from, report.getStartDate());
+        assertEquals(to, report.getEndDate());
+        assertEquals("Нет активного шаблона", report.getTemplateName());
     }
 }
