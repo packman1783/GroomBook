@@ -59,14 +59,15 @@ public class TelegramNotificationService implements NotificationService {
                 
                 👤 %s
                 📞 %s
-                🐕 %s (%s)
+                🐾 %s *%s* (%s)
                 📅 %s в %s–%s
                 %s
                 """,
                 escapeMarkdown(client.getName()),
-                client.getPhone(),
+                escapeMarkdown(client.getPhone()),
+                pet.getType().getEmoji(),
                 escapeMarkdown(pet.getName()),
-                pet.getType().name().toLowerCase(),
+                escapeMarkdown(pet.getType().getLabel()),
                 slot.getDate().format(DATE_FMT),
                 slot.getStartTime().format(TIME_FMT),
                 slot.getEndTime().format(TIME_FMT),
@@ -114,7 +115,7 @@ public class TelegramNotificationService implements NotificationService {
                 ✅ *Запись подтверждена\\!*
                 
                 📅 %s в %s–%s
-                🐾 %s
+                🐾 %s *%s* (%s)
                 %s
                 
                 Ждём вас\\! 🎉
@@ -122,7 +123,9 @@ public class TelegramNotificationService implements NotificationService {
                 slot.getDate().format(DATE_FMT),
                 slot.getStartTime().format(TIME_FMT),
                 slot.getEndTime().format(TIME_FMT),
+                booking.getPet().getType().getEmoji(),
                 escapeMarkdown(booking.getPet().getName()),
+                escapeMarkdown(booking.getPet().getType().getLabel()),
                 masterAddress.isBlank()
                         ? ""
                         : "📍 " + escapeMarkdown(masterAddress)
@@ -156,14 +159,16 @@ public class TelegramNotificationService implements NotificationService {
         String text = String.format("""
                 🔔 *Напоминание о записи*
                 
-                Завтра в *%s–%s* стрижка %s 🐾
+                Завтра в *%s–%s* стрижка %s *%s* (%s) 🐾
                 %s
                 
                 Ждём вас\\!
                 """,
                 slot.getStartTime().format(TIME_FMT),
                 slot.getEndTime().format(TIME_FMT),
+                booking.getPet().getType().getEmoji(),
                 escapeMarkdown(booking.getPet().getName()),
+                escapeMarkdown(booking.getPet().getType().getLabel()),
                 masterAddress.isBlank()
                         ? ""
                         : "📍 " + escapeMarkdown(masterAddress)

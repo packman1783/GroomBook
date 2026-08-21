@@ -76,7 +76,7 @@ public class InlineKeyboardFactory {
      */
     public InlineKeyboardMarkup petsKeyboard(List<Pet> pets) {
         var rows = pets.stream()
-                .map(pet -> new InlineKeyboardRow(button(petEmoji(pet) + " " + pet.getName(),
+                .map(pet -> new InlineKeyboardRow(button(pet.getType().getFullDisplay() + " " + pet.getName(),
                         CallbackData.build(CallbackData.BOOK_PET, pet.getId()))))
                 .collect(Collectors.toList());
         
@@ -91,9 +91,9 @@ public class InlineKeyboardFactory {
     public InlineKeyboardMarkup petTypeKeyboard() {
         return InlineKeyboardMarkup.builder()
                 .keyboardRow(new InlineKeyboardRow(
-                        button("🐕 Собака", CallbackData.build(CallbackData.PET_TYPE, "DOG")),
-                        button("🐈 Кошка", CallbackData.build(CallbackData.PET_TYPE, "CAT")),
-                        button("🐾 Другое", CallbackData.build(CallbackData.PET_TYPE, "OTHER"))
+                        button(org.example.groombook.model.enums.PetType.DOG.getFullDisplay(), CallbackData.build(CallbackData.PET_TYPE, "DOG")),
+                        button(org.example.groombook.model.enums.PetType.CAT.getFullDisplay(), CallbackData.build(CallbackData.PET_TYPE, "CAT")),
+                        button(org.example.groombook.model.enums.PetType.OTHER.getFullDisplay(), CallbackData.build(CallbackData.PET_TYPE, "OTHER"))
                 ))
                 .build();
     }
@@ -213,10 +213,6 @@ public class InlineKeyboardFactory {
     }
 
     private String petEmoji(Pet pet) {
-        return switch (pet.getType()) {
-            case DOG -> "🐕";
-            case CAT -> "🐈";
-            case OTHER -> "🐾";
-        };
+        return pet.getType().getEmoji();
     }
 }

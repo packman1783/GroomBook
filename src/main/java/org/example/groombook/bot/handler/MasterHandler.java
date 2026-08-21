@@ -191,7 +191,7 @@ public class MasterHandler {
             String msgText = String.format("""
                             [%s] %s–%s
                             👤 %s, %s
-                            🐾 %s
+                            🐾 %s *%s* (%s)
                             Статус: %s
                             %s""",
                     booking.getSlot().getDate().format(DATE_FMT),
@@ -199,7 +199,9 @@ public class MasterHandler {
                     booking.getSlot().getEndTime().format(TIME_FMT),
                     booking.getClient().getName(),
                     booking.getClient().getPhone(),
+                    booking.getPet().getType().getEmoji(),
                     booking.getPet().getName(),
+                    booking.getPet().getType().getLabel(),
                     statusLabel,
                     booking.getClientComment() != null ? "💬 " + booking.getClientComment() : ""
             );

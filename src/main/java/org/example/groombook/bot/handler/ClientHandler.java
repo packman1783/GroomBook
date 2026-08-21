@@ -111,7 +111,10 @@ public class ClientHandler {
 
         StringBuilder sb = new StringBuilder("🐾 *Ваши питомцы:*\n\n");
         for (Pet pet : pets) {
-            sb.append(String.format("- %s (%s)\n", pet.getName(), pet.getType()));
+            sb.append(String.format("- %s *%s*\n", 
+                    pet.getType().getEmoji(), 
+                    pet.getName()));
+            sb.append(String.format("  └ Тип: %s\n", pet.getType().getLabel()));
         }
 
         send(telegramId, sb.toString(), keyboards.addPetButton());
@@ -269,12 +272,14 @@ public class ClientHandler {
                     *Детали записи:*
                     📅 Дата: %s
                     ⏰ Время: %s
-                    🐾 Питомец: %s
+                    🐾 Питомец: %s *%s* (%s)
                     
                     Мастер подтвердит запись в ближайшее время. Вы получите уведомление!""",
                     booking.getSlot().getDate().format(DATE_FMT),
                     booking.getSlot().getStartTime().format(TIME_FMT),
-                    booking.getPet().getName());
+                    booking.getPet().getType().getEmoji(),
+                    booking.getPet().getName(),
+                    booking.getPet().getType().getLabel());
             
             send(telegramId, successMsg);
         } catch (BookingLimitExceededException e) {
@@ -314,11 +319,13 @@ public class ClientHandler {
             TimeSlot slot = booking.getSlot();
             String statusLabel = booking.isConfirmed() ? "✅ подтверждена" : "⏳ ожидает подтверждения";
 
-            String text = String.format("📅 %s в %s–%s\n🐾 %s\nСтатус: %s",
+            String text = String.format("📅 %s в %s–%s\n🐾 %s *%s* (%s)\nСтатус: %s",
                     slot.getDate().format(DATE_FMT),
                     slot.getStartTime().format(TIME_FMT),
                     slot.getEndTime().format(TIME_FMT),
+                    booking.getPet().getType().getEmoji(),
                     booking.getPet().getName(),
+                    booking.getPet().getType().getLabel(),
                     statusLabel);
 
             send(telegramId, text, keyboards.cancelBookingKeyboard(booking.getId()));
@@ -492,6 +499,7 @@ public class ClientHandler {
         SendMessage message = SendMessage.builder()
                 .chatId(chatId.toString())
                 .text(text)
+                .parseMode("Markdown")
                 .replyMarkup(keyboard)
                 .build();
         try {
