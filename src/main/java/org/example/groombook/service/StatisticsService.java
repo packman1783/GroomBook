@@ -6,14 +6,22 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.groombook.exception.ClientNotFoundException;
 import org.example.groombook.model.Booking;
 import org.example.groombook.model.Client;
+import org.example.groombook.model.DayOverride;
+import org.example.groombook.model.ScheduleTemplate;
+import org.example.groombook.model.TemplateDay;
+import org.example.groombook.model.TimeSlot;
 import org.example.groombook.model.enums.BookingStatus;
 import org.example.groombook.model.enums.BookingType;
+import org.example.groombook.model.enums.SlotStatus;
 import org.example.groombook.repository.BookingRepository;
 import org.example.groombook.repository.ClientRepository;
+import org.example.groombook.repository.DayOverrideRepository;
 import org.example.groombook.repository.PetRepository;
+import org.example.groombook.repository.ScheduleTemplateRepository;
 import org.example.groombook.repository.TimeSlotRepository;
 import org.example.groombook.service.dto.ClientStats;
 import org.example.groombook.service.dto.MonthlyReport;
+import org.example.groombook.service.dto.WeeklyReport;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +53,8 @@ public class StatisticsService {
     private final ClientRepository clientRepository;
     private final PetRepository petRepository;
     private final TimeSlotRepository timeSlotRepository;
+    private final ScheduleTemplateRepository templateRepository;
+    private final DayOverrideRepository overrideRepository;
 
     // Месячный отчёт
 
@@ -125,6 +135,59 @@ public class StatisticsService {
                 .totalUniqueClients(totalUniqueClients)
                 .newClients(newClients)
                 .returningClients(returningClients)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public WeeklyReport getWeeklyReport(LocalDate from, LocalDate to) {
+        // 1. Информация о шаблоне
+        ScheduleTemplate template = templateRepository.findActive().orElse(null);
+        String templateName = template != null ? template.getName() : "Нет активного шаблона";
+        int slotDuration = template != null ? template.getSlotDurationHours() : 0;
+
+        long workingDaysCount = 0;
+        long holidayDaysCount = 0;
+
+        if (template != null) {
+            workingDaysCount = template.getDays().stream().filter(TemplateDay::isWorking).count();
+            holidayDaysCount = 7 - workingDaysCount;
+        }
+
+        // 2. Статистика по записям и слотам
+        List<Booking> bookings = bookingRepository.findActiveInDateRange(from, to);
+        List<TimeSlot> slots = timeSlotRepository.findByDateBetween(from, to);
+
+        long completed = bookings.stream().filter(b -> b.getStatus() == BookingStatus.COMPLETED).count();
+        long cancelled = bookings.stream().filter(b -> b.getStatus() == BookingStatus.CANCELLED_BY_CLIENT
+                || b.getStatus() == BookingStatus.CANCELLED_BY_MASTER).count();
+        long noShow = bookings.stream().filter(b -> b.getStatus() == BookingStatus.NO_SHOW).count();
+
+        long manual = slots.stream().filter(s -> s.getStatus() == SlotStatus.MANUAL_BOOKING).count();
+        long blocked = slots.stream().filter(s -> s.getStatus() == SlotStatus.BLOCKED).count();
+        long totalSlots = slots.size();
+
+        // 3. Переопределения
+        List<DayOverride> overrides = overrideRepository.findByDateBetweenOrderByDateAsc(from, to);
+        Map<LocalDate, String> overridesMap = overrides.stream()
+                .collect(Collectors.toMap(
+                        DayOverride::getDate,
+                        o -> o.getReason() != null ? o.getReason() : o.getOverrideType().toString()
+                ));
+
+        return WeeklyReport.builder()
+                .startDate(from)
+                .endDate(to)
+                .templateName(templateName)
+                .slotDurationHours(slotDuration)
+                .workingDaysCount((int) workingDaysCount)
+                .holidayDaysCount((int) holidayDaysCount)
+                .totalSlots(totalSlots)
+                .completedBookings(completed)
+                .cancelledBookings(cancelled)
+                .noShowBookings(noShow)
+                .manualBookings(manual)
+                .blockedSlots(blocked)
+                .overrides(overridesMap)
                 .build();
     }
 

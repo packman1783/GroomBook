@@ -14,6 +14,8 @@ import org.example.groombook.model.enums.ClientStatus;
 import org.example.groombook.service.BookingService;
 import org.example.groombook.service.ClientService;
 import org.example.groombook.service.NotificationService;
+import org.example.groombook.service.StatisticsService;
+import org.example.groombook.service.dto.WeeklyReport;
 
 import org.springframework.stereotype.Component;
 
@@ -46,6 +48,7 @@ import java.util.List;
 public class MasterHandler {
     private final ClientService clientService;
     private final BookingService bookingService;
+    private final StatisticsService statisticsService;
     private final NotificationService notificationService;
     private final ScheduleHandler scheduleHandler;
     private final TemplateWizardHandler templateWizardHandler;
@@ -70,6 +73,7 @@ public class MasterHandler {
             case "📅 Завтра" -> command = "/tomorrow";
             case "🗓 Неделя" -> command = "/week";
             case "🗓 2 недели" -> command = "/fortnight";
+            case "📊 Отчет за неделю" -> command = "/weekly_report";
             case "⚙️ Расписание" -> command = "/schedule";
             case "🆕 Шаблон" -> command = "/newtemplate";
             case "📝 Записать вручную" -> command = "/manual";
@@ -83,6 +87,7 @@ public class MasterHandler {
             case "/tomorrow" -> showBookingsForDate(telegramId, LocalDate.now().plusDays(1));
             case "/week" -> showBookingsForPeriod(telegramId, "неделю", LocalDate.now(), LocalDate.now().plusDays(6));
             case "/fortnight" -> showBookingsForPeriod(telegramId, "2 недели", LocalDate.now(), LocalDate.now().plusDays(13));
+            case "/weekly_report" -> showWeeklyReport(telegramId);
             case "/schedule" -> scheduleHandler.handleScheduleCommand(telegramId);
             case "/vacation" -> scheduleHandler.handleVacationCommand(telegramId);
             case "/manual" -> scheduleHandler.handleManualCommand(telegramId);
@@ -113,6 +118,42 @@ public class MasterHandler {
                 *Совет:* Для подтверждения или отмены записи используйте кнопки под сообщениями о новых заявках.
                 """;
         send(telegramId, helpText, keyboards.masterMainMenu());
+    }
+
+    /**
+     * Формирует и отправляет детальный статистический отчет за неделю.
+     */
+    private void showWeeklyReport(Long telegramId) {
+        LocalDate from = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1);
+        LocalDate to = from.plusDays(6);
+
+        WeeklyReport report = statisticsService.getWeeklyReport(from, to);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("📊 *ОТЧЕТ ЗА НЕДЕЛЮ* (").append(from.format(DATE_FMT)).append(" - ").append(to.format(DATE_FMT)).append(")\n\n");
+
+        sb.append("🗓 *Расписание:*\n");
+        sb.append("🔹 Шаблон: ").append(report.getTemplateName()).append("\n");
+        sb.append("🔹 Время на стрижку: ").append(report.getSlotDurationHours()).append(" ч.\n");
+        sb.append("🔹 Рабочих дней: ").append(report.getWorkingDaysCount()).append("\n");
+        sb.append("🔹 Выходных: ").append(report.getHolidayDaysCount()).append("\n\n");
+
+        sb.append("📈 *Статистика записей:*\n");
+        sb.append("✅ Выполнено: ").append(report.getCompletedBookings()).append("\n");
+        sb.append("📝 Вручную (договорных): ").append(report.getManualBookings()).append("\n");
+        sb.append("❌ Отмен: ").append(report.getCancelledBookings()).append("\n");
+        sb.append("🚫 Пропусков (no-show): ").append(report.getNoShowBookings()).append("\n");
+        sb.append("🔒 Заблокировано слотов: ").append(report.getBlockedSlots()).append("\n");
+        sb.append("📊 Загрузка: ").append(String.format("%.1f%%", report.getLoadPercent())).append("\n\n");
+
+        if (!report.getOverrides().isEmpty()) {
+            sb.append("⚠️ *Исключения/Переопределения:*\n");
+            report.getOverrides().forEach((date, reason) ->
+                sb.append("▫️ ").append(date.format(DATE_FMT)).append(": ").append(reason).append("\n")
+            );
+        }
+
+        send(telegramId, sb.toString());
     }
 
     /**

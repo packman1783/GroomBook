@@ -77,6 +77,9 @@ public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
      * Проверка: есть ли хотя бы один свободный слот на дату.
      * Оптимизация — не тянуть весь список только ради кнопки в боте.
      */
+    /** Все слоты в диапазоне дат */
+    List<TimeSlot> findByDateBetween(LocalDate from, LocalDate to);
+
     boolean existsByDateAndStatus(LocalDate date, SlotStatus status);
 
     /**
