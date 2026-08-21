@@ -322,7 +322,11 @@ class BookingServiceTest {
 
             assertThatThrownBy(() ->
                     bookingService.createBooking(100L, 100L, 10L, null))
-                    .isInstanceOf(BookingLimitExceededException.class);
+                    .isInstanceOf(BookingLimitExceededException.class)
+                    .satisfies(ex -> {
+                        BookingLimitExceededException e = (BookingLimitExceededException) ex;
+                        assertThat(e.getNextAvailableDate()).isNotNull();
+                    });
 
             verify(bookingRepository, never()).save(any());
         }
