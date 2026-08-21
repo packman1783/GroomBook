@@ -278,8 +278,9 @@ public class ClientHandler {
             
             send(telegramId, successMsg);
         } catch (BookingLimitExceededException e) {
-            send(telegramId, "На этой неделе вы уже записаны максимальное количество раз (2). " +
-                    "Попробуйте выбрать слот на следующей неделе.");
+            String dateStr = e.getNextAvailableDate().format(DATE_FMT);
+            send(telegramId, String.format("На этой неделе вы уже записаны максимальное количество раз (2). " +
+                    "Следующая запись будет возможна с %s. Попробуйте выбрать слот на следующей неделе.", dateStr));
         } catch (SlotTooSoonException e) {
             send(telegramId, "Запись возможна не позднее чем за 1 час до начала. " +
                     "Выберите другое время через /book.");

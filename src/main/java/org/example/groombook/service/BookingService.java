@@ -468,7 +468,8 @@ public class BookingService {
                 clientId, weekStart, weekEnd);
 
         if (count >= BOOKING_LIMIT_PER_WEEK) {
-            throw new BookingLimitExceededException(clientId);
+            LocalDate nextMonday = weekStart.plusDays(7).toLocalDate();
+            throw new BookingLimitExceededException(clientId, nextMonday);
         }
     }
 
