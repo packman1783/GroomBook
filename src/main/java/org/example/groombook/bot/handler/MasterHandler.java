@@ -229,6 +229,7 @@ public class MasterHandler {
             case CallbackData.CONFIRM_BOOKING -> handleConfirm(telegramId, CallbackData.payloadAsLong(data), callbackId);
             case CallbackData.REJECT_BOOKING -> handleRejectRequest(telegramId, CallbackData.payloadAsLong(data), callbackId);
             case CallbackData.COMPLETE_BOOKING -> handleCompleteRequest(telegramId, CallbackData.payloadAsLong(data), callbackId);
+            case CallbackData.MASTER_COMPLETE_SKIP -> handleMasterCompleteSkip(telegramId, callbackId);
             case CallbackData.NO_SHOW_BOOKING -> handleNoShow(telegramId, CallbackData.payloadAsLong(data), callbackId);
             case CallbackData.BLOCK_CLIENT -> handleBlockClientRequest(telegramId, CallbackData.payloadAsLong(data), callbackId);
             case CallbackData.UNBLOCK_CLIENT -> handleUnblockClient(telegramId, CallbackData.payloadAsLong(data), callbackId);
@@ -240,7 +241,8 @@ public class MasterHandler {
                  CallbackData.SCHEDULE_MANUAL,
                  CallbackData.TEMPLATE_ACTIVATE,
                  CallbackData.BLOCK_PICK_SLOT,
-                 CallbackData.MANUAL_PICK_PET -> scheduleHandler.handleCallback(telegramId, data, callbackId);
+                 CallbackData.MANUAL_PICK_PET,
+                 CallbackData.MANUAL_BOOKING_SKIP_COMMENT -> scheduleHandler.handleCallback(telegramId, data, callbackId);
 
             default -> answerCallback(callbackId, null);
         }
@@ -332,7 +334,25 @@ public class MasterHandler {
         UserSession session = sessionManager.get(telegramId);
         session.setPendingBookingId(bookingId);
         session.setState(SessionState.AWAITING_MASTER_NOTE);
-        send(telegramId, "Заметка о визите (или \"-\" чтобы пропустить):");
+        send(telegramId, "Заметка о визите (или нажмите кнопку чтобы пропустить):",
+                keyboards.masterCompleteKeyboard());
+    }
+
+    /** Пропуск ввода заметки мастером. */
+    private void handleMasterCompleteSkip(Long telegramId, String callbackId) {
+        answerCallback(callbackId, null);
+        UserSession session = sessionManager.get(telegramId);
+        if (session.getState() == SessionState.AWAITING_MASTER_NOTE) {
+            Long bookingId = session.getPendingBookingId();
+            try {
+                bookingService.completeBooking(bookingId, null);
+                send(telegramId, "Визит отмечен как завершённый (без комментария).");
+            } catch (GroomBookException e) {
+                send(telegramId, "Не удалось завершить: " + e.getMessage());
+            } finally {
+                session.reset();
+            }
+        }
     }
 
     /** Отметка о том, что клиент не явился на процедуру (No-Show). */
