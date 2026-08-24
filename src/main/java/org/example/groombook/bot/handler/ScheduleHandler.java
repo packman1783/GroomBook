@@ -3,6 +3,7 @@ package org.example.groombook.bot.handler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.example.groombook.bot.keyboard.InlineKeyboardFactory;
 import org.example.groombook.bot.session.SessionManager;
 import org.example.groombook.bot.session.SessionState;
 import org.example.groombook.bot.session.UserSession;
@@ -56,6 +57,7 @@ public class ScheduleHandler {
     private final BookingService bookingService;
     private final SessionManager sessionManager;
     private final TelegramClient telegramClient;
+    private final InlineKeyboardFactory keyboards;
 
     /** Формат ввода дат пользователем (например, "25.12.2026"). */
     private static final DateTimeFormatter DATE_INPUT_FMT = DateTimeFormatter.ofPattern("dd.MM.yyyy");
@@ -100,6 +102,7 @@ public class ScheduleHandler {
             case CallbackData.TEMPLATE_ACTIVATE -> startTemplateActivation(telegramId, CallbackData.payloadAsLong(data), callbackId);
             case CallbackData.BLOCK_PICK_SLOT -> finishBlockSlotPick(telegramId, CallbackData.payloadAsLong(data), callbackId);
             case CallbackData.MANUAL_PICK_PET -> finishManualPetPick(telegramId, CallbackData.payloadAsLong(data), callbackId);
+            case CallbackData.MANUAL_BOOKING_SKIP_COMMENT -> handleManualBookingSkipComment(telegramId, callbackId);
             default -> answerCallback(callbackId, null);
         }
     }
@@ -358,7 +361,17 @@ public class ScheduleHandler {
         UserSession session = sessionManager.get(telegramId);
         session.setPendingManualTime(time);
         session.setState(SessionState.AWAITING_MANUAL_COMMENT);
-        send(telegramId, "Комментарий к записи (или \"-\" чтобы пропустить):");
+        send(telegramId, "Комментарий к записи (или нажмите кнопку ниже, чтобы пропустить):",
+                keyboards.manualBookingSkipKeyboard());
+    }
+
+    /** Пропуск ввода комментария при ручной записи. */
+    private void handleManualBookingSkipComment(Long telegramId, String callbackId) {
+        answerCallback(callbackId, null);
+        UserSession session = sessionManager.get(telegramId);
+        if (session.getState() == SessionState.AWAITING_MANUAL_COMMENT) {
+            handleManualCommentEntered(telegramId, "-");
+        }
     }
 
     /** Финализация создания запись вручную мастером. */
