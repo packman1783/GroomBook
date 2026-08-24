@@ -13,7 +13,7 @@ public interface ScheduleTemplateRepository extends JpaRepository<ScheduleTempla
      * Активный шаблон — всегда один.
      * Уникальность гарантируется partial index в БД и логикой ScheduleService.
      */
-    @Query("SELECT t FROM ScheduleTemplate t JOIN FETCH t.days WHERE t.active = true")
+    @Query("SELECT DISTINCT t FROM ScheduleTemplate t JOIN FETCH t.days WHERE t.active = true")
     Optional<ScheduleTemplate> findActive();
 
     /** Все шаблоны для отображения в меню управления расписанием */
