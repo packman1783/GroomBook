@@ -310,7 +310,8 @@ class ScheduleServiceTest {
             LocalDate from = LocalDate.now().plusDays(1);
 
             when(templateRepository.findById(2L)).thenReturn(Optional.of(newTemplate));
-            when(templateRepository.findActive()).thenReturn(Optional.of(oldTemplate));
+            when(templateRepository.findAll()).thenReturn(List.of(oldTemplate, newTemplate));
+            when(templateRepository.findActive()).thenReturn(Optional.of(newTemplate));
             when(templateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(overrideRepository.findByDate(any())).thenReturn(Optional.empty());
             when(timeSlotRepository.existsByDateAndStartTime(any(), any())).thenReturn(false);
@@ -327,6 +328,7 @@ class ScheduleServiceTest {
 
             // FREE-слоты удалены и пересозданы
             verify(timeSlotRepository).deleteFreeGeneratedSlotsFrom(from);
+            verify(templateRepository).flush();
         }
 
         @Test
@@ -336,10 +338,8 @@ class ScheduleServiceTest {
             LocalDate from = LocalDate.now();
 
             when(templateRepository.findById(2L)).thenReturn(Optional.of(newTemplate));
-
-            when(templateRepository.findActive())
-                    .thenReturn(Optional.empty())
-                    .thenReturn(Optional.of(newTemplate));
+            when(templateRepository.findAll()).thenReturn(List.of(newTemplate));
+            when(templateRepository.findActive()).thenReturn(Optional.of(newTemplate));
 
             when(templateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(overrideRepository.findByDate(any())).thenReturn(Optional.empty());
@@ -350,6 +350,7 @@ class ScheduleServiceTest {
 
             assertThat(newTemplate.isActive()).isTrue();
             verify(timeSlotRepository).deleteFreeGeneratedSlotsFrom(from);
+            verify(templateRepository).flush();
         }
 
         @Test
