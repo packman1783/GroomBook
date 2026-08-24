@@ -106,6 +106,26 @@ class UpdateDispatcherTest {
     }
 
     @Test
+    void dispatch_weeklyReportButtonFromMaster_shouldClearSessionAndCallMasterHandler() {
+        Update update = mock(Update.class);
+        Message message = mock(Message.class);
+        UserSession session = new UserSession();
+
+        when(update.hasCallbackQuery()).thenReturn(false);
+        when(update.hasMessage()).thenReturn(true);
+        when(update.getMessage()).thenReturn(message);
+        when(message.getChatId()).thenReturn(MASTER_ID);
+        when(sessionManager.get(MASTER_ID)).thenReturn(session);
+        when(message.hasText()).thenReturn(true);
+        when(message.getText()).thenReturn("📊 Отчет за неделю");
+
+        updateDispatcher.dispatch(update);
+
+        verify(sessionManager).clear(MASTER_ID);
+        verify(masterHandler).handleCommand(MASTER_ID, "📊 Отчет за неделю");
+    }
+
+    @Test
     void dispatch_textInputFromClientInState_shouldCallClientHandlerTextInput() {
         Update update = mock(Update.class);
         Message message = mock(Message.class);
