@@ -66,15 +66,23 @@ public class ScheduleService {
         ScheduleTemplate template = templateRepository.findById(templateId)
                 .orElseThrow(() -> new TemplateNotFoundException(templateId));
 
-        // Деактивируем текущий активный шаблон
-        templateRepository.findActive().ifPresent(current -> {
+        // Деактивируем ВСЕ текущие активные шаблоны
+        List<ScheduleTemplate> activeTemplates = templateRepository.findAll().stream()
+                .filter(ScheduleTemplate::isActive)
+                .toList();
+        
+        for (ScheduleTemplate current : activeTemplates) {
             current.deactivate();
             templateRepository.save(current);
-        });
+        }
 
         template.activate(from, until);
         templateRepository.save(template);
 
+        // Принудительно сохраняем изменения в БД, чтобы последующий поиск активного шаблона 
+        // в generateSlotsForDay увидел обновленное состояние
+        templateRepository.flush();
+        
         // Удаляем все сгенерированные FREE-слоты начиная с даты активации
         timeSlotRepository.deleteFreeGeneratedSlotsFrom(from);
 
