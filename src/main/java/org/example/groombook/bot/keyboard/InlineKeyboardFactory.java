@@ -109,6 +109,24 @@ public class InlineKeyboardFactory {
     }
 
     /**
+     * Кнопка для пропуска ввода комментария мастером
+     */
+    public InlineKeyboardMarkup masterCompleteKeyboard() {
+        return InlineKeyboardMarkup.builder()
+                .keyboardRow(new InlineKeyboardRow(button("➡️ Продолжить без комментария", CallbackData.MASTER_COMPLETE_SKIP)))
+                .build();
+    }
+
+    /**
+     * Кнопка для пропуска комментария при ручной записи мастером
+     */
+    public InlineKeyboardMarkup manualBookingSkipKeyboard() {
+        return InlineKeyboardMarkup.builder()
+                .keyboardRow(new InlineKeyboardRow(button("➡️ Продолжить без комментария", CallbackData.MANUAL_BOOKING_SKIP_COMMENT)))
+                .build();
+    }
+
+    /**
      * Кнопка "Отменить" для одной брони в списке /mybookings
      */
     public InlineKeyboardMarkup cancelBookingKeyboard(Long bookingId) {
