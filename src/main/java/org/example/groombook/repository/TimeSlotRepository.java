@@ -1,8 +1,10 @@
 package org.example.groombook.repository;
 
+import jakarta.persistence.LockModeType;
 import org.example.groombook.model.TimeSlot;
 import org.example.groombook.model.enums.SlotStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +15,11 @@ import java.util.List;
 import java.util.Optional;
 
 public interface TimeSlotRepository extends JpaRepository<TimeSlot, Long> {
+
+    /** Найти слот с блокировкой для предотвращения Race Condition при бронировании */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM TimeSlot s WHERE s.id = :id")
+    Optional<TimeSlot> findByIdWithLock(@Param("id") Long id);
 
     /** Все слоты на конкретную дату — для мастера (видит блокировки и причины) */
     List<TimeSlot> findByDateOrderByStartTimeAsc(LocalDate date);
