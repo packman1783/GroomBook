@@ -465,7 +465,7 @@ public class MasterHandler {
                 .build();
     }
 
-    private void send(Long chatId, String text) {
+    public void send(Long chatId, String text) {
         send(chatId, text, (ReplyKeyboard) null);
     }
 
