@@ -269,6 +269,39 @@ class ScheduleServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("Edge Cases for Overrides and Bookings")
+    class EdgeCases {
+        @Test
+        @DisplayName("✅ активация нового шаблона НЕ удаляет слоты с бронями")
+        void activateTemplate_keepsBookedSlots() {
+            LocalDate date = LocalDate.now().plusDays(1);
+            
+            ScheduleTemplate newTemplate = buildTemplate(2L, "New", false, 1);
+            when(templateRepository.findById(2L)).thenReturn(Optional.of(newTemplate));
+            when(templateRepository.findAll()).thenReturn(List.of(activeTemplate, newTemplate));
+            // После flush и активации findActive() должен вернуть новый шаблон, 
+            // так как в тесте мы используем Mockito, нам нужно это явно задать, 
+            // если метод activateTemplate его вызывает через generateSlotsForRange -> generateSlotsForDay
+            when(templateRepository.findActive()).thenReturn(Optional.of(newTemplate));
+
+            scheduleService.activateTemplate(2L, date, date.plusDays(7));
+
+            verify(timeSlotRepository).deleteFreeGeneratedSlotsFrom(date);
+        }
+
+        @Test
+        @DisplayName("✅ blockDay удаляет только FREE слоты")
+        void blockDay_deletesOnlyFreeSlots() {
+            LocalDate date = LocalDate.now().plusDays(2);
+            
+            scheduleService.blockDay(date, OverrideType.HOLIDAY, "Holiday");
+
+            verify(overrideRepository).save(any());
+            verify(timeSlotRepository).deleteFreeSlotsByDate(date);
+        }
+    }
+
     // generateSlotsForRange — генерация на диапазон дат
 
     @Nested
