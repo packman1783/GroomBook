@@ -1,6 +1,7 @@
 package org.example.groombook.infrastructure.calendar;
 
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.CalendarScopes;
@@ -19,21 +20,17 @@ import java.util.List;
 @Configuration
 public class GoogleCalendarConfig {
 
-    /**
-     * Путь к файлу credentials.json от Google Service Account.
-     * Задаётся в application.yml: grooming.google.credentials-path
-     *
-     * Как получить:
-     * 1. Google Cloud Console → IAM → Service Accounts → Create
-     * 2. Скачать JSON-ключ
-     * 3. В Google Calendar → настройки календаря → поделиться с email сервис-аккаунта
-     * 4. Указать путь к JSON в application.yml
-     */
     @Value("${grooming.google.credentials-path}")
     private String credentialsPath;
 
     @Value("${grooming.google.application-name:GroomBook}")
     private String applicationName;
+
+    @Value("${grooming.google.connect-timeout-ms:5000}")
+    private int connectTimeout;
+
+    @Value("${grooming.google.read-timeout-ms:10000}")
+    private int readTimeout;
 
     @Bean
     public Calendar googleCalendarClient() throws IOException, GeneralSecurityException {
@@ -41,10 +38,16 @@ public class GoogleCalendarConfig {
                 .fromStream(new FileInputStream(credentialsPath))
                 .createScoped(List.of(CalendarScopes.CALENDAR));
 
+        HttpRequestInitializer requestInitializer = request -> {
+            new HttpCredentialsAdapter(credentials).initialize(request);
+            request.setConnectTimeout(connectTimeout);
+            request.setReadTimeout(readTimeout);
+        };
+
         return new Calendar.Builder(
                 GoogleNetHttpTransport.newTrustedTransport(),
                 GsonFactory.getDefaultInstance(),
-                new HttpCredentialsAdapter(credentials))
+                requestInitializer)
                 .setApplicationName(applicationName)
                 .build();
     }
