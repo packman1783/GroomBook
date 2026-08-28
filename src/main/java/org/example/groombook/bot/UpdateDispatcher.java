@@ -35,12 +35,34 @@ public class UpdateDispatcher {
     private Long masterTelegramId;
 
     public void dispatch(Update update) {
-        if (update.hasCallbackQuery()) {
-            dispatchCallback(update.getCallbackQuery());
-        } else if (update.hasMessage()) {
-            dispatchMessage(update.getMessage());
+        try {
+            if (update.hasCallbackQuery()) {
+                dispatchCallback(update.getCallbackQuery());
+            } else if (update.hasMessage()) {
+                dispatchMessage(update.getMessage());
+            }
+        } catch (Exception e) {
+            log.error("Критическая ошибка при диспетчеризации апдейта: {}", update.getUpdateId(), e);
+            sendErrorMessage(update);
         }
         // Прочие типы апдейтов (фото, стикеры и т.д.) сейчас не обрабатываются
+    }
+
+    private void sendErrorMessage(Update update) {
+        Long chatId = null;
+        if (update.hasMessage()) {
+            chatId = update.getMessage().getChatId();
+        } else if (update.hasCallbackQuery()) {
+            chatId = update.getCallbackQuery().getMessage().getChatId();
+        }
+
+        if (chatId != null) {
+            if (chatId.equals(masterTelegramId)) {
+                masterHandler.send(chatId, "❌ Произошла системная ошибка при обработке вашего запроса. Пожалуйста, попробуйте позже.");
+            } else {
+                clientHandler.send(chatId, "❌ Извините, произошла ошибка при обработке вашего запроса. Попробуйте еще раз или свяжитесь с мастером напрямую.");
+            }
+        }
     }
 
     private void dispatchMessage(Message message) {
