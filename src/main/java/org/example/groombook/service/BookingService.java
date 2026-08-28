@@ -502,7 +502,7 @@ public class BookingService {
     }
 
     private TimeSlot findSlot(Long slotId) {
-        return timeSlotRepository.findById(slotId)
+        return timeSlotRepository.findByIdWithLock(slotId)
                 .orElseThrow(() -> new SlotNotFoundException(slotId));
     }
 
