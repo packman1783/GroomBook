@@ -199,7 +199,7 @@ class BookingServiceTest {
                     .thenReturn(Optional.of(activeClient));
             when(petRepository.findById(10L))
                     .thenReturn(Optional.of(activePet));
-            when(timeSlotRepository.findById(100L))
+            when(timeSlotRepository.findByIdWithLock(100L))
                     .thenReturn(Optional.of(freeSlot));
             when(bookingRepository.countActiveByClientInWeek(anyLong(), any(), any()))
                     .thenReturn(0L);
@@ -224,7 +224,7 @@ class BookingServiceTest {
         void createBooking_withoutComment_success() {
             when(clientRepository.findByTelegramId(100L)).thenReturn(Optional.of(activeClient));
             when(petRepository.findById(10L)).thenReturn(Optional.of(activePet));
-            when(timeSlotRepository.findById(100L)).thenReturn(Optional.of(freeSlot));
+            when(timeSlotRepository.findByIdWithLock(100L)).thenReturn(Optional.of(freeSlot));
             when(bookingRepository.countActiveByClientInWeek(anyLong(), any(), any())).thenReturn(0L);
             when(bookingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -249,7 +249,7 @@ class BookingServiceTest {
 
             when(clientRepository.findByTelegramId(200L)).thenReturn(Optional.of(blockedClient));
             when(petRepository.findById(10L)).thenReturn(Optional.of(blockedClientPet));
-            when(timeSlotRepository.findById(100L)).thenReturn(Optional.of(freeSlot));
+            when(timeSlotRepository.findByIdWithLock(100L)).thenReturn(Optional.of(freeSlot));
 
             assertThatThrownBy(() ->
                     bookingService.createBooking(200L, 100L, 10L, null))
@@ -264,7 +264,7 @@ class BookingServiceTest {
         void createBooking_slotBooked_throwsException() {
             when(clientRepository.findByTelegramId(100L)).thenReturn(Optional.of(activeClient));
             when(petRepository.findById(10L)).thenReturn(Optional.of(activePet));
-            when(timeSlotRepository.findById(101L)).thenReturn(Optional.of(bookedSlot));
+            when(timeSlotRepository.findByIdWithLock(101L)).thenReturn(Optional.of(bookedSlot));
 
             assertThatThrownBy(() ->
                     bookingService.createBooking(100L, 101L, 10L, null))
@@ -278,7 +278,7 @@ class BookingServiceTest {
         void createBooking_slotBlocked_throwsException() {
             when(clientRepository.findByTelegramId(100L)).thenReturn(Optional.of(activeClient));
             when(petRepository.findById(10L)).thenReturn(Optional.of(activePet));
-            when(timeSlotRepository.findById(102L)).thenReturn(Optional.of(blockedSlot));
+            when(timeSlotRepository.findByIdWithLock(102L)).thenReturn(Optional.of(blockedSlot));
 
             assertThatThrownBy(() ->
                     bookingService.createBooking(100L, 102L, 10L, null))
@@ -301,7 +301,7 @@ class BookingServiceTest {
 
             when(clientRepository.findByTelegramId(100L)).thenReturn(Optional.of(activeClient));
             when(petRepository.findById(10L)).thenReturn(Optional.of(activePet));
-            when(timeSlotRepository.findById(103L)).thenReturn(Optional.of(soonSlot));
+            when(timeSlotRepository.findByIdWithLock(103L)).thenReturn(Optional.of(soonSlot));
 
             assertThatThrownBy(() ->
                     bookingService.createBooking(100L, 103L, 10L, null))
@@ -315,7 +315,7 @@ class BookingServiceTest {
         void createBooking_weeklyLimitExceeded_throwsException() {
             when(clientRepository.findByTelegramId(100L)).thenReturn(Optional.of(activeClient));
             when(petRepository.findById(10L)).thenReturn(Optional.of(activePet));
-            when(timeSlotRepository.findById(100L)).thenReturn(Optional.of(freeSlot));
+            when(timeSlotRepository.findByIdWithLock(100L)).thenReturn(Optional.of(freeSlot));
             // Уже 2 активные брони на этой неделе
             when(bookingRepository.countActiveByClientInWeek(anyLong(), any(), any()))
                     .thenReturn(2L);
@@ -336,7 +336,7 @@ class BookingServiceTest {
         void createBooking_petRefused_throwsException() {
             when(clientRepository.findByTelegramId(100L)).thenReturn(Optional.of(activeClient));
             when(petRepository.findById(11L)).thenReturn(Optional.of(refusedPet));
-            when(timeSlotRepository.findById(100L)).thenReturn(Optional.of(freeSlot));
+            when(timeSlotRepository.findByIdWithLock(100L)).thenReturn(Optional.of(freeSlot));
 
             assertThatThrownBy(() ->
                     bookingService.createBooking(100L, 100L, 11L, null))
