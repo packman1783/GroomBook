@@ -488,8 +488,8 @@ public class ClientHandler {
     /**
      * Отправляет обычное текстовое сообщение пользователю.
      */
-    private void send(Long chatId, String text) {
-        send(chatId, text, null);
+    public void send(Long chatId, String text) {
+        send(chatId, text, (ReplyKeyboard) null);
     }
 
     /**
